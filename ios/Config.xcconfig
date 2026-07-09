@@ -1,0 +1,2 @@
+// Shared Xcode build settings. Pulls secrets from gitignored Secrets.xcconfig.
+#include? "Secrets.xcconfig"

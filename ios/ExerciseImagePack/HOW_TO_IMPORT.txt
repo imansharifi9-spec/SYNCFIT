@@ -1,0 +1,8 @@
+# Drop exercise images here, then run:
+#   ./ios/scripts/import_exercise_images.sh
+#
+# Naming: use lowercase slugs with underscores (see EXPECTED_FILENAMES.txt).
+# Example: lateral_raise.png, bench_press.png, squat.png
+#
+# Formats: .png, .jpg, .jpeg
+# After import, rebuild in Xcode (Cmd+R).

@@ -1,0 +1,828 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* SyncFitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* SyncFitApp.swift */; };
+		A10000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppState.swift */; };
+		A10000000000000000000003 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* UserProfile.swift */; };
+		A10000000000000000000004 /* SyncFitTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* SyncFitTheme.swift */; };
+		A10000000000000000000005 /* FitnessDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* FitnessDataStore.swift */; };
+		A10000000000000000000006 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* RootView.swift */; };
+		A10000000000000000000007 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* MainTabView.swift */; };
+		A10000000000000000000008 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* AuthView.swift */; };
+		A10000000000000000000009 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* OnboardingView.swift */; };
+		A10000000000000000000010 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* HomeView.swift */; };
+		A10000000000000000000011 /* WorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* WorkoutView.swift */; };
+		A10000000000000000000012 /* NutritionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* NutritionView.swift */; };
+		A10000000000000000000013 /* ProgressViewTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ProgressViewTab.swift */; };
+		A10000000000000000000014 /* CoachesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* CoachesView.swift */; };
+		A10000000000000000000015 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* SettingsView.swift */; };
+		A10000000000000000000016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* Assets.xcassets */; };
+		A10000000000000000000017 /* FitnessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* FitnessModels.swift */; };
+		A10000000000000000000018 /* SampleDataSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* SampleDataSeeder.swift */; };
+		A10000000000000000000019 /* ExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* ExerciseLibrary.swift */; };
+		A10000000000000000000020 /* NutritionSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* NutritionSheets.swift */; };
+		A10000000000000000000067 /* MacroSummaryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000067 /* MacroSummaryViews.swift */; };
+		A10000000000000000000022 /* HistoryPeriod.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* HistoryPeriod.swift */; };
+		A10000000000000000000023 /* PeriodNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* PeriodNavigator.swift */; };
+		A10000000000000000000024 /* WorkoutRoutineSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* WorkoutRoutineSheets.swift */; };
+		A10000000000000000000025 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* ProfileView.swift */; };
+		A10000000000000000000026 /* AIInsightService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* AIInsightService.swift */; };
+		A10000000000000000000027 /* ExerciseCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* ExerciseCatalog.swift */; };
+		A10000000000000000000028 /* ExerciseIllustrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* ExerciseIllustrationView.swift */; };
+		A10000000000000000000029 /* FoodLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* FoodLibrary.swift */; };
+		A10000000000000000000030 /* USDAFoodDataCentralService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* USDAFoodDataCentralService.swift */; };
+		A10000000000000000000031 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* AppConfig.swift */; };
+		A10000000000000000000032 /* SyncFitPlusUpgradeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* SyncFitPlusUpgradeSheet.swift */; };
+		A10000000000000000000033 /* CalorieCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* CalorieCalculator.swift */; };
+		A10000000000000000000034 /* CalorieTargetPlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* CalorieTargetPlannerView.swift */; };
+		A10000000000000000000035 /* EditProfileSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* EditProfileSheet.swift */; };
+		A10000000000000000000036 /* WeightLineChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* WeightLineChartView.swift */; };
+		A10000000000000000000037 /* ActiveWorkoutFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* ActiveWorkoutFlow.swift */; };
+		A10000000000000000000038 /* WorkoutScheduleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000039 /* WorkoutScheduleViews.swift */; };
+		A10000000000000000000039 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000040 /* HealthKitService.swift */; };
+		A10000000000000000000040 /* AppleHealthSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000041 /* AppleHealthSettingsSection.swift */; };
+		A10000000000000000000041 /* AuthenticationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000043 /* AuthenticationManager.swift */; };
+		A10000000000000000000042 /* FirestoreDatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000044 /* FirestoreDatabaseManager.swift */; };
+		A10000000000000000000043 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B60000000000000000000002 /* FirebaseAuth */; };
+		A10000000000000000000044 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = B60000000000000000000003 /* FirebaseFirestore */; };
+		A10000000000000000000045 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = B60000000000000000000004 /* FirebaseStorage */; };
+		A10000000000000000000046 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = B60000000000000000000001 /* FirebaseCore */; };
+		A10000000000000000000047 /* FirebaseConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000045 /* FirebaseConfiguration.swift */; };
+		A10000000000000000000048 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000046 /* GoogleService-Info.plist */; };
+		A10000000000000000000049 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B60000000000000000000005 /* GoogleSignIn */; };
+		A10000000000000000000050 /* SignInWithAppleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000048 /* SignInWithAppleButton.swift */; };
+		A10000000000000000000051 /* ProgramTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000051 /* ProgramTemplates.swift */; };
+		A10000000000000000000052 /* ProgramOnboardingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000052 /* ProgramOnboardingViews.swift */; };
+		A10000000000000000000053 /* AddExerciseSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000053 /* AddExerciseSheet.swift */; };
+		A10000000000000000000054 /* SyncFitAICoachCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000054 /* SyncFitAICoachCard.swift */; };
+		A10000000000000000000055 /* NutritionMacroHeroCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000055 /* NutritionMacroHeroCard.swift */; };
+		A10000000000000000000056 /* FoodSearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000056 /* FoodSearchSheet.swift */; };
+		A10000000000000000000057 /* FoodPortionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000057 /* FoodPortionSheet.swift */; };
+		A10000000000000000000058 /* BarcodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000058 /* BarcodeScannerView.swift */; };
+		A10000000000000000000059 /* NutritionixService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000059 /* NutritionixService.swift */; };
+		A10000000000000000000060 /* OpenFoodFactsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000060 /* OpenFoodFactsService.swift */; };
+		A10000000000000000000061 /* ProgressAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000061 /* ProgressAnalytics.swift */; };
+		A10000000000000000000062 /* ProgressComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000062 /* ProgressComponents.swift */; };
+		A10000000000000000000063 /* ProgressPhotoStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000063 /* ProgressPhotoStorage.swift */; };
+		A10000000000000000000064 /* ExerciseMaxWeight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000064 /* ExerciseMaxWeight.swift */; };
+		A10000000000000000000071 /* CoachModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000071 /* CoachModels.swift */; };
+		A10000000000000000000072 /* CoachService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000072 /* CoachService.swift */; };
+		A10000000000000000000073 /* CoachProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000073 /* CoachProfileScreen.swift */; };
+		A10000000000000000000074 /* CoachLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000074 /* CoachLoginView.swift */; };
+		A10000000000000000000075 /* CoachMainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000075 /* CoachMainTabView.swift */; };
+		A10000000000000000000076 /* CoachPhotoStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000076 /* CoachPhotoStorage.swift */; };
+		A10000000000000000000077 /* CoachTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000077 /* CoachTheme.swift */; };
+		A10000000000000000000078 /* CoachProfileEditorComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000078 /* CoachProfileEditorComponents.swift */; };
+		A10000000000000000000079 /* CoachAuthCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000079 /* CoachAuthCrypto.swift */; };
+		A1000000000000000000007A /* CoachDataSharingConsentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007A /* CoachDataSharingConsentView.swift */; };
+		A1000000000000000000007B /* CoachChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007B /* CoachChatService.swift */; };
+		A1000000000000000000007C /* CoachChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007C /* CoachChatView.swift */; };
+		A1000000000000000000007E /* CoachPlaceholderContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007E /* CoachPlaceholderContent.swift */; };
+		A1000000000000000000007D /* CoachClientDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007D /* CoachClientDataView.swift */; };
+		A10000000000000000000081 /* CoachRoutineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000081 /* CoachRoutineModels.swift */; };
+		A10000000000000000000082 /* CoachRoutineViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000082 /* CoachRoutineViews.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* SyncFitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFitApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* SyncFitTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFitTheme.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* FitnessDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessDataStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* WorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* NutritionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionView.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* ProgressViewTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressViewTab.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* CoachesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachesView.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000000000000000000017 /* SyncFit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncFit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000018 /* FitnessModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000019 /* SampleDataSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleDataSeeder.swift; sourceTree = "<group>"; };
+		A20000000000000000000020 /* ExerciseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibrary.swift; sourceTree = "<group>"; };
+		A20000000000000000000021 /* NutritionSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionSheets.swift; sourceTree = "<group>"; };
+		A20000000000000000000067 /* MacroSummaryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroSummaryViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000023 /* HistoryPeriod.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPeriod.swift; sourceTree = "<group>"; };
+		A20000000000000000000024 /* PeriodNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodNavigator.swift; sourceTree = "<group>"; };
+		A20000000000000000000025 /* WorkoutRoutineSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutRoutineSheets.swift; sourceTree = "<group>"; };
+		A20000000000000000000026 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		A20000000000000000000027 /* AIInsightService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIInsightService.swift; sourceTree = "<group>"; };
+		A20000000000000000000028 /* ExerciseCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalog.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* ExerciseIllustrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseIllustrationView.swift; sourceTree = "<group>"; };
+		A20000000000000000000030 /* FoodLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodLibrary.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* USDAFoodDataCentralService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USDAFoodDataCentralService.swift; sourceTree = "<group>"; };
+		A20000000000000000000032 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		A20000000000000000000033 /* SyncFitPlusUpgradeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFitPlusUpgradeSheet.swift; sourceTree = "<group>"; };
+		A20000000000000000000034 /* CalorieCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalorieCalculator.swift; sourceTree = "<group>"; };
+		A20000000000000000000035 /* CalorieTargetPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalorieTargetPlannerView.swift; sourceTree = "<group>"; };
+		A20000000000000000000036 /* EditProfileSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileSheet.swift; sourceTree = "<group>"; };
+		A20000000000000000000037 /* WeightLineChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeightLineChartView.swift; sourceTree = "<group>"; };
+		A20000000000000000000038 /* ActiveWorkoutFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutFlow.swift; sourceTree = "<group>"; };
+		A20000000000000000000039 /* WorkoutScheduleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutScheduleViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000040 /* HealthKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
+		A20000000000000000000041 /* AppleHealthSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleHealthSettingsSection.swift; sourceTree = "<group>"; };
+		A20000000000000000000042 /* SyncFit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SyncFit.entitlements; sourceTree = "<group>"; };
+		A20000000000000000000043 /* AuthenticationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000044 /* FirestoreDatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreDatabaseManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000045 /* FirebaseConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseConfiguration.swift; sourceTree = "<group>"; };
+		A20000000000000000000046 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = GoogleService-Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000047 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000048 /* SignInWithAppleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInWithAppleButton.swift; sourceTree = "<group>"; };
+		A20000000000000000000051 /* ProgramTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramTemplates.swift; sourceTree = "<group>"; };
+		A20000000000000000000052 /* ProgramOnboardingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramOnboardingViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000053 /* AddExerciseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddExerciseSheet.swift; sourceTree = "<group>"; };
+		A20000000000000000000054 /* SyncFitAICoachCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFitAICoachCard.swift; sourceTree = "<group>"; };
+		A20000000000000000000055 /* NutritionMacroHeroCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionMacroHeroCard.swift; sourceTree = "<group>"; };
+		A20000000000000000000056 /* FoodSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodSearchSheet.swift; sourceTree = "<group>"; };
+		A20000000000000000000057 /* FoodPortionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodPortionSheet.swift; sourceTree = "<group>"; };
+		A20000000000000000000058 /* BarcodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarcodeScannerView.swift; sourceTree = "<group>"; };
+		A20000000000000000000059 /* NutritionixService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionixService.swift; sourceTree = "<group>"; };
+		A20000000000000000000060 /* OpenFoodFactsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenFoodFactsService.swift; sourceTree = "<group>"; };
+		A20000000000000000000061 /* ProgressAnalytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressAnalytics.swift; sourceTree = "<group>"; };
+		A20000000000000000000062 /* ProgressComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressComponents.swift; sourceTree = "<group>"; };
+		A20000000000000000000063 /* ProgressPhotoStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoStorage.swift; sourceTree = "<group>"; };
+		A20000000000000000000064 /* ExerciseMaxWeight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMaxWeight.swift; sourceTree = "<group>"; };
+		A20000000000000000000071 /* CoachModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000072 /* CoachService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachService.swift; sourceTree = "<group>"; };
+		A20000000000000000000073 /* CoachProfileScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachProfileScreen.swift; sourceTree = "<group>"; };
+		A20000000000000000000074 /* CoachLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachLoginView.swift; sourceTree = "<group>"; };
+		A20000000000000000000075 /* CoachMainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachMainTabView.swift; sourceTree = "<group>"; };
+		A20000000000000000000076 /* CoachPhotoStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachPhotoStorage.swift; sourceTree = "<group>"; };
+		A20000000000000000000077 /* CoachTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachTheme.swift; sourceTree = "<group>"; };
+		A20000000000000000000078 /* CoachProfileEditorComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachProfileEditorComponents.swift; sourceTree = "<group>"; };
+		A20000000000000000000079 /* CoachAuthCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachAuthCrypto.swift; sourceTree = "<group>"; };
+		A2000000000000000000007A /* CoachDataSharingConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachDataSharingConsentView.swift; sourceTree = "<group>"; };
+		A2000000000000000000007B /* CoachChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachChatService.swift; sourceTree = "<group>"; };
+		A2000000000000000000007C /* CoachChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachChatView.swift; sourceTree = "<group>"; };
+		A2000000000000000000007E /* CoachPlaceholderContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachPlaceholderContent.swift; sourceTree = "<group>"; };
+		A2000000000000000000007D /* CoachClientDataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachClientDataView.swift; sourceTree = "<group>"; };
+		A20000000000000000000081 /* CoachRoutineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachRoutineModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000082 /* CoachRoutineViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachRoutineViews.swift; sourceTree = "<group>"; };
+		A2000000000000000000007F /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		A20000000000000000000080 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000046 /* FirebaseCore in Frameworks */,
+				A10000000000000000000043 /* FirebaseAuth in Frameworks */,
+				A10000000000000000000044 /* FirebaseFirestore in Frameworks */,
+				A10000000000000000000045 /* FirebaseStorage in Frameworks */,
+				A10000000000000000000049 /* GoogleSignIn in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000007F /* Config.xcconfig */,
+				A20000000000000000000080 /* Secrets.xcconfig.example */,
+				A40000000000000000000002 /* SyncFit */,
+				A40000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* SyncFit */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000046 /* GoogleService-Info.plist */,
+				A20000000000000000000047 /* Info.plist */,
+				A20000000000000000000001 /* SyncFitApp.swift */,
+				A20000000000000000000002 /* AppState.swift */,
+				A20000000000000000000042 /* SyncFit.entitlements */,
+				A40000000000000000000004 /* Models */,
+				A40000000000000000000005 /* Services */,
+				A40000000000000000000006 /* Theme */,
+				A40000000000000000000007 /* Views */,
+				A20000000000000000000016 /* Assets.xcassets */,
+			);
+			path = SyncFit;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000017 /* SyncFit.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000003 /* UserProfile.swift */,
+				A20000000000000000000018 /* FitnessModels.swift */,
+				A20000000000000000000020 /* ExerciseLibrary.swift */,
+				A20000000000000000000028 /* ExerciseCatalog.swift */,
+				A20000000000000000000030 /* FoodLibrary.swift */,
+				A20000000000000000000023 /* HistoryPeriod.swift */,
+				A20000000000000000000051 /* ProgramTemplates.swift */,
+				A20000000000000000000071 /* CoachModels.swift */,
+				A20000000000000000000081 /* CoachRoutineModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000005 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000005 /* FitnessDataStore.swift */,
+				A20000000000000000000019 /* SampleDataSeeder.swift */,
+				A20000000000000000000027 /* AIInsightService.swift */,
+				A20000000000000000000031 /* USDAFoodDataCentralService.swift */,
+				A20000000000000000000059 /* NutritionixService.swift */,
+				A20000000000000000000060 /* OpenFoodFactsService.swift */,
+				A20000000000000000000032 /* AppConfig.swift */,
+				A20000000000000000000034 /* CalorieCalculator.swift */,
+				A20000000000000000000040 /* HealthKitService.swift */,
+				A20000000000000000000043 /* AuthenticationManager.swift */,
+				A20000000000000000000044 /* FirestoreDatabaseManager.swift */,
+				A20000000000000000000045 /* FirebaseConfiguration.swift */,
+				A20000000000000000000072 /* CoachService.swift */,
+				A2000000000000000000007B /* CoachChatService.swift */,
+				A2000000000000000000007E /* CoachPlaceholderContent.swift */,
+				A20000000000000000000079 /* CoachAuthCrypto.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000006 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000004 /* SyncFitTheme.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000007 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000006 /* RootView.swift */,
+				A20000000000000000000007 /* MainTabView.swift */,
+				A40000000000000000000008 /* Auth */,
+				A40000000000000000000009 /* Onboarding */,
+				A40000000000000000000010 /* Home */,
+				A40000000000000000000011 /* Workouts */,
+				A40000000000000000000012 /* Nutrition */,
+				A40000000000000000000013 /* Progress */,
+				A40000000000000000000014 /* Coaches */,
+				A40000000000000000000015 /* Settings */,
+				A40000000000000000000016 /* Shared */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000008 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000008 /* AuthView.swift */,
+				A20000000000000000000048 /* SignInWithAppleButton.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000009 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000009 /* OnboardingView.swift */,
+				A20000000000000000000052 /* ProgramOnboardingViews.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000010 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000010 /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000011 /* Workouts */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000011 /* WorkoutView.swift */,
+				A20000000000000000000038 /* ActiveWorkoutFlow.swift */,
+				A20000000000000000000025 /* WorkoutRoutineSheets.swift */,
+				A20000000000000000000039 /* WorkoutScheduleViews.swift */,
+				A20000000000000000000029 /* ExerciseIllustrationView.swift */,
+				A20000000000000000000053 /* AddExerciseSheet.swift */,
+				A20000000000000000000054 /* SyncFitAICoachCard.swift */,
+			);
+			path = Workouts;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000012 /* Nutrition */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000012 /* NutritionView.swift */,
+				A20000000000000000000021 /* NutritionSheets.swift */,
+				A20000000000000000000067 /* MacroSummaryViews.swift */,
+				A20000000000000000000055 /* NutritionMacroHeroCard.swift */,
+				A20000000000000000000056 /* FoodSearchSheet.swift */,
+				A20000000000000000000057 /* FoodPortionSheet.swift */,
+				A20000000000000000000058 /* BarcodeScannerView.swift */,
+			);
+			path = Nutrition;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000013 /* Progress */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000013 /* ProgressViewTab.swift */,
+				A20000000000000000000037 /* WeightLineChartView.swift */,
+				A20000000000000000000061 /* ProgressAnalytics.swift */,
+				A20000000000000000000062 /* ProgressComponents.swift */,
+				A20000000000000000000063 /* ProgressPhotoStorage.swift */,
+				A20000000000000000000064 /* ExerciseMaxWeight.swift */,
+			);
+			path = Progress;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000014 /* Coaches */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000014 /* CoachesView.swift */,
+				A20000000000000000000073 /* CoachProfileScreen.swift */,
+				A20000000000000000000074 /* CoachLoginView.swift */,
+				A20000000000000000000075 /* CoachMainTabView.swift */,
+				A20000000000000000000076 /* CoachPhotoStorage.swift */,
+				A20000000000000000000077 /* CoachTheme.swift */,
+				A20000000000000000000078 /* CoachProfileEditorComponents.swift */,
+				A2000000000000000000007A /* CoachDataSharingConsentView.swift */,
+				A2000000000000000000007C /* CoachChatView.swift */,
+				A2000000000000000000007D /* CoachClientDataView.swift */,
+				A20000000000000000000082 /* CoachRoutineViews.swift */,
+			);
+			path = Coaches;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000015 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000015 /* SettingsView.swift */,
+				A20000000000000000000026 /* ProfileView.swift */,
+				A20000000000000000000036 /* EditProfileSheet.swift */,
+				A20000000000000000000041 /* AppleHealthSettingsSection.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000016 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000024 /* PeriodNavigator.swift */,
+				A20000000000000000000033 /* SyncFitPlusUpgradeSheet.swift */,
+				A20000000000000000000035 /* CalorieTargetPlannerView.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* SyncFit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A70000000000000000000003 /* Build configuration list for PBXNativeTarget "SyncFit" */;
+			buildPhases = (
+				A60000000000000000000003 /* Verify GoogleService-Info.plist */,
+				A60000000000000000000001 /* Sources */,
+				A30000000000000000000001 /* Frameworks */,
+				A60000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SyncFit;
+			packageProductDependencies = (
+				B60000000000000000000001 /* FirebaseCore */,
+				B60000000000000000000002 /* FirebaseAuth */,
+				B60000000000000000000003 /* FirebaseFirestore */,
+				B60000000000000000000004 /* FirebaseStorage */,
+				B60000000000000000000005 /* GoogleSignIn */,
+			);
+			productName = SyncFit;
+			productReference = A20000000000000000000017 /* SyncFit.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A80000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 2650;
+				TargetAttributes = {
+					A50000000000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = A70000000000000000000001 /* Build configuration list for PBXProject "SyncFit" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A40000000000000000000001;
+			packageReferences = (
+				B60000000000000000000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				C60000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
+			productRefGroup = A40000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* SyncFit */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A60000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000016 /* Assets.xcassets in Resources */,
+				A10000000000000000000048 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A60000000000000000000003 /* Verify GoogleService-Info.plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Verify GoogleService-Info.plist";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nPLIST=\"${SRCROOT}/SyncFit/GoogleService-Info.plist\"\nALT_PLIST=\"${SRCROOT}/SyncFit/GoogleService-Info (1).plist\"\nif [ -f \"$ALT_PLIST\" ] && [ ! -f \"$PLIST\" ]; then\n  echo \"error: Rename GoogleService-Info (1).plist to GoogleService-Info.plist in ios/SyncFit/\"\n  exit 1\nfi\nif [ ! -f \"$PLIST\" ]; then\n  echo \"error: Missing GoogleService-Info.plist at ios/SyncFit/GoogleService-Info.plist\"\n  exit 1\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A60000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* SyncFitApp.swift in Sources */,
+				A10000000000000000000002 /* AppState.swift in Sources */,
+				A10000000000000000000003 /* UserProfile.swift in Sources */,
+				A10000000000000000000004 /* SyncFitTheme.swift in Sources */,
+				A10000000000000000000005 /* FitnessDataStore.swift in Sources */,
+				A10000000000000000000006 /* RootView.swift in Sources */,
+				A10000000000000000000007 /* MainTabView.swift in Sources */,
+				A10000000000000000000008 /* AuthView.swift in Sources */,
+				A10000000000000000000009 /* OnboardingView.swift in Sources */,
+				A10000000000000000000010 /* HomeView.swift in Sources */,
+				A10000000000000000000011 /* WorkoutView.swift in Sources */,
+				A10000000000000000000012 /* NutritionView.swift in Sources */,
+				A10000000000000000000013 /* ProgressViewTab.swift in Sources */,
+				A10000000000000000000014 /* CoachesView.swift in Sources */,
+				A10000000000000000000015 /* SettingsView.swift in Sources */,
+				A10000000000000000000017 /* FitnessModels.swift in Sources */,
+				A10000000000000000000018 /* SampleDataSeeder.swift in Sources */,
+				A10000000000000000000019 /* ExerciseLibrary.swift in Sources */,
+				A10000000000000000000020 /* NutritionSheets.swift in Sources */,
+				A10000000000000000000067 /* MacroSummaryViews.swift in Sources */,
+				A10000000000000000000022 /* HistoryPeriod.swift in Sources */,
+				A10000000000000000000023 /* PeriodNavigator.swift in Sources */,
+				A10000000000000000000024 /* WorkoutRoutineSheets.swift in Sources */,
+				A10000000000000000000025 /* ProfileView.swift in Sources */,
+				A10000000000000000000026 /* AIInsightService.swift in Sources */,
+				A10000000000000000000027 /* ExerciseCatalog.swift in Sources */,
+				A10000000000000000000028 /* ExerciseIllustrationView.swift in Sources */,
+				A10000000000000000000029 /* FoodLibrary.swift in Sources */,
+				A10000000000000000000030 /* USDAFoodDataCentralService.swift in Sources */,
+				A10000000000000000000031 /* AppConfig.swift in Sources */,
+				A10000000000000000000032 /* SyncFitPlusUpgradeSheet.swift in Sources */,
+				A10000000000000000000033 /* CalorieCalculator.swift in Sources */,
+				A10000000000000000000034 /* CalorieTargetPlannerView.swift in Sources */,
+				A10000000000000000000035 /* EditProfileSheet.swift in Sources */,
+				A10000000000000000000036 /* WeightLineChartView.swift in Sources */,
+				A10000000000000000000037 /* ActiveWorkoutFlow.swift in Sources */,
+				A10000000000000000000038 /* WorkoutScheduleViews.swift in Sources */,
+				A10000000000000000000039 /* HealthKitService.swift in Sources */,
+				A10000000000000000000040 /* AppleHealthSettingsSection.swift in Sources */,
+				A10000000000000000000041 /* AuthenticationManager.swift in Sources */,
+				A10000000000000000000042 /* FirestoreDatabaseManager.swift in Sources */,
+				A10000000000000000000047 /* FirebaseConfiguration.swift in Sources */,
+				A10000000000000000000050 /* SignInWithAppleButton.swift in Sources */,
+				A10000000000000000000051 /* ProgramTemplates.swift in Sources */,
+				A10000000000000000000052 /* ProgramOnboardingViews.swift in Sources */,
+				A10000000000000000000053 /* AddExerciseSheet.swift in Sources */,
+				A10000000000000000000054 /* SyncFitAICoachCard.swift in Sources */,
+				A10000000000000000000055 /* NutritionMacroHeroCard.swift in Sources */,
+				A10000000000000000000056 /* FoodSearchSheet.swift in Sources */,
+				A10000000000000000000057 /* FoodPortionSheet.swift in Sources */,
+				A10000000000000000000058 /* BarcodeScannerView.swift in Sources */,
+				A10000000000000000000059 /* NutritionixService.swift in Sources */,
+				A10000000000000000000060 /* OpenFoodFactsService.swift in Sources */,
+				A10000000000000000000061 /* ProgressAnalytics.swift in Sources */,
+				A10000000000000000000062 /* ProgressComponents.swift in Sources */,
+				A10000000000000000000063 /* ProgressPhotoStorage.swift in Sources */,
+				A10000000000000000000064 /* ExerciseMaxWeight.swift in Sources */,
+				A10000000000000000000071 /* CoachModels.swift in Sources */,
+				A10000000000000000000072 /* CoachService.swift in Sources */,
+				A10000000000000000000073 /* CoachProfileScreen.swift in Sources */,
+				A10000000000000000000074 /* CoachLoginView.swift in Sources */,
+				A10000000000000000000075 /* CoachMainTabView.swift in Sources */,
+				A10000000000000000000076 /* CoachPhotoStorage.swift in Sources */,
+				A10000000000000000000077 /* CoachTheme.swift in Sources */,
+				A10000000000000000000078 /* CoachProfileEditorComponents.swift in Sources */,
+				A10000000000000000000079 /* CoachAuthCrypto.swift in Sources */,
+				A1000000000000000000007A /* CoachDataSharingConsentView.swift in Sources */,
+				A1000000000000000000007B /* CoachChatService.swift in Sources */,
+				A1000000000000000000007E /* CoachPlaceholderContent.swift in Sources */,
+				A1000000000000000000007C /* CoachChatView.swift in Sources */,
+				A1000000000000000000007D /* CoachClientDataView.swift in Sources */,
+				A10000000000000000000081 /* CoachRoutineModels.swift in Sources */,
+				A10000000000000000000082 /* CoachRoutineViews.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A90000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A90000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A90000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A2000000000000000000007F /* Config.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SyncFit/SyncFit.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 2DMDU95WTV;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SyncFit/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SyncFit;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "SyncFit reads workouts, nutrition, weight, steps, and active energy from Apple Health to keep your dashboard complete.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "SyncFit saves your logged workouts, meals, and weight to Apple Health.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "SyncFit uses the camera to scan food barcodes and capture progress photos.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SyncFit uses your photo library to select progress photos stored privately in the app.";
+				INFOPLIST_KEY_NUTRITIONIX_APP_ID = "";
+				INFOPLIST_KEY_NUTRITIONIX_APP_KEY = "";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.syncfit.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A90000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A2000000000000000000007F /* Config.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SyncFit/SyncFit.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 2DMDU95WTV;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SyncFit/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SyncFit;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "SyncFit reads workouts, nutrition, weight, steps, and active energy from Apple Health to keep your dashboard complete.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "SyncFit saves your logged workouts, meals, and weight to Apple Health.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "SyncFit uses the camera to scan food barcodes and capture progress photos.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SyncFit uses your photo library to select progress photos stored privately in the app.";
+				INFOPLIST_KEY_NUTRITIONIX_APP_ID = "";
+				INFOPLIST_KEY_NUTRITIONIX_APP_KEY = "";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.syncfit.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A70000000000000000000001 /* Build configuration list for PBXProject "SyncFit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000001 /* Debug */,
+				A90000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A70000000000000000000003 /* Build configuration list for PBXNativeTarget "SyncFit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000003 /* Debug */,
+				A90000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B60000000000000000000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.0.0;
+			};
+		};
+		C60000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B60000000000000000000001 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B60000000000000000000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		B60000000000000000000002 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B60000000000000000000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		B60000000000000000000003 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B60000000000000000000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		B60000000000000000000004 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B60000000000000000000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+		B60000000000000000000005 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C60000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A80000000000000000000001 /* Project object */;
+}

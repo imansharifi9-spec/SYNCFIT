@@ -1,0 +1,13 @@
+# Muscle-group character icons (not per-exercise photos)
+#
+# Drop PNGs here, then run:
+#   ./ios/scripts/import_muscle_group_images.sh
+#
+# Filenames:
+#   arms.png       (pink)
+#   back.png       (blue)
+#   chest.png      (orange)
+#   legs.png       (purple)
+#   shoulders.png  (yellow)
+#   core.png       (abs — optional, uses fallback icon until added)
+#   cardio.png     (optional, uses fallback icon until added)

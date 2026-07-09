@@ -1,0 +1,230 @@
+rules_version = '2';
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+
+
+    function isSignedIn() {
+
+      return request.auth != null;
+
+    }
+
+
+
+    function isOwner(userId) {
+
+      return isSignedIn() && request.auth.uid == userId;
+
+    }
+
+
+
+    function connectionDocId(clientId, coachId) {
+
+      return clientId <= coachId ? clientId + '_' + coachId : coachId + '_' + clientId;
+
+    }
+
+
+
+    function coachClientConnection(clientId) {
+
+      return get(/databases/$(database)/documents/coach_clients/$(connectionDocId(clientId, request.auth.uid)));
+
+    }
+
+
+
+    function coachCanReadClientData(clientId, permission) {
+
+      let conn = coachClientConnection(clientId);
+
+      return conn != null
+
+        && conn.data.status == 'active'
+
+        && conn.data.coachId == request.auth.uid
+
+        && conn.data.permissions[permission] == true;
+
+    }
+
+
+
+    // User profile and subcollections — owner only; coaches read shared client data
+
+    match /users/{userId} {
+
+      allow read, write: if isOwner(userId);
+      allow read: if coachClientConnection(userId).data.status == 'active'
+        && coachClientConnection(userId).data.coachId == request.auth.uid;
+
+        allow read, write: if isOwner(userId);
+
+        allow read: if coachCanReadClientData(userId, 'progress');
+
+      }
+
+
+
+      match /meals/{docId} {
+
+        allow read, write: if isOwner(userId);
+
+        allow read: if coachCanReadClientData(userId, 'nutrition');
+
+      }
+
+
+
+      match /workouts/{docId} {
+
+        allow read, write: if isOwner(userId);
+
+        allow read: if coachCanReadClientData(userId, 'workouts');
+
+      }
+
+
+
+      match /{subcollection}/{docId} {
+
+        allow read, write: if isOwner(userId);
+
+      }
+
+    }
+
+
+
+    // Coach access codes — DEV: any signed-in user can read; production tightens to owner-only
+
+    match /coach_codes/{codeId} {
+
+      allow read: if isSignedIn();
+
+      // DEV ONLY: client-side seed helper for `dev_code` document — remove before production
+
+      allow create, update: if isSignedIn() && codeId == "dev_code";
+
+      allow delete: if false;
+
+      allow update: if isSignedIn()
+
+        && request.auth.uid == resource.data.userId
+
+        && resource.data.isActive == true
+
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activatedAt'])
+
+        && request.resource.data.activatedAt != null;
+
+    }
+
+
+
+    // Coach marketplace profiles — public read; coach writes own profile
+
+    match /coaches/{coachId} {
+
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+
+        && request.auth.uid == request.resource.data.coachId
+
+        && coachId == request.auth.uid;
+
+      allow update, delete: if isSignedIn()
+
+        && request.auth.uid == resource.data.coachId
+
+        && coachId == request.auth.uid;
+
+      match /routine_templates/{templateId} {
+
+        allow read, write: if isSignedIn() && request.auth.uid == coachId;
+
+      }
+
+    }
+
+
+
+    // Coach ↔ client connections
+
+    match /coach_clients/{connectionId} {
+
+      allow read: if isSignedIn()
+
+        && (request.auth.uid == resource.data.coachId
+
+            || request.auth.uid == resource.data.clientId
+
+            || request.auth.uid == resource.data.clientUserID);
+
+      allow create: if isSignedIn();
+
+      allow update: if isSignedIn()
+
+        && (request.auth.uid == resource.data.clientId
+
+            || request.auth.uid == resource.data.clientUserID);
+
+      allow delete: if false;
+
+    }
+
+
+
+    // Coach ↔ client chat threads
+
+    match /conversations/{conversationId} {
+
+      allow read, update: if isSignedIn()
+
+        && request.auth.uid in resource.data.participants;
+
+      allow create: if isSignedIn();
+
+
+
+      match /messages/{messageId} {
+
+        allow read, create: if isSignedIn();
+
+        allow update, delete: if false;
+
+      }
+
+    }
+
+
+
+    // Coach messages — participants in the conversation
+
+    match /coach_messages/{messageId} {
+
+      allow read: if isSignedIn()
+
+        && (request.auth.uid == resource.data.coachId
+
+            || request.auth.uid == resource.data.clientUserID);
+
+      allow create: if isSignedIn()
+
+        && (request.auth.uid == request.resource.data.coachId
+
+            || request.auth.uid == request.resource.data.clientUserID);
+
+      allow update, delete: if false;
+
+    }
+
+  }
+
+}
+
