@@ -27,11 +27,15 @@ final class AuthenticationManager: ObservableObject {
         guard !UserDefaults.standard.bool(forKey: hasLaunchedBeforeKey) else { return false }
         clearPersistedSignInSessions()
         clearLastAuthenticatedUserID()
+        clearLocalDataOwnerUserID()
         UserDefaults.standard.set(true, forKey: hasLaunchedBeforeKey)
         return true
     }
 
     static let lastAuthenticatedUserIDKey = "com.syncfit.app.lastAuthenticatedUserID"
+    /// Survives sign-out. Identifies which Auth UID currently owns the on-device SwiftData cache.
+    /// Cleared only on fresh install — never on logout — so the next login can detect account switches.
+    static let localDataOwnerUserIDKey = "com.syncfit.app.localDataOwnerUserID"
 
     static var lastAuthenticatedUserID: String? {
         get { UserDefaults.standard.string(forKey: lastAuthenticatedUserIDKey) }
@@ -44,8 +48,23 @@ final class AuthenticationManager: ObservableObject {
         }
     }
 
+    static var localDataOwnerUserID: String? {
+        get { UserDefaults.standard.string(forKey: localDataOwnerUserIDKey) }
+        set {
+            if let newValue {
+                UserDefaults.standard.set(newValue, forKey: localDataOwnerUserIDKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: localDataOwnerUserIDKey)
+            }
+        }
+    }
+
     static func clearLastAuthenticatedUserID() {
         UserDefaults.standard.removeObject(forKey: lastAuthenticatedUserIDKey)
+    }
+
+    static func clearLocalDataOwnerUserID() {
+        UserDefaults.standard.removeObject(forKey: localDataOwnerUserIDKey)
     }
 
     static func clearPersistedSignInSessions() {

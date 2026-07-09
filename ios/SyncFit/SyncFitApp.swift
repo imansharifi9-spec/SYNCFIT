@@ -94,10 +94,8 @@ struct SyncFitApp: App {
     }
 
     private func handleUserSignedOut() {
-        // Do NOT wipe local profile/routines on sign-out for the same device user.
-        // Wiping forced hasCompletedOnboarding=false and empty routines, which made
-        // re-login flash onboarding and reset schedules. Cross-account switches clear
-        // inside syncUserSession when the Firebase UID changes.
+        // Keep local cache for same-user re-login, but do NOT clear localDataOwnerUserID.
+        // That key is how the next login detects a different account after sign-out.
         AuthenticationManager.clearLastAuthenticatedUserID()
         coachService.resetForUserSwitch()
         chatService.teardown()
@@ -106,7 +104,6 @@ struct SyncFitApp: App {
 
     private func syncUserSession() async {
         // Always clear the restore gate, even on early exits / failures.
-        // A stuck isRestoringSession=true freezes RootView on the spinner forever.
         appState.beginSessionRestore()
         defer { appState.endSessionRestore() }
 
@@ -121,20 +118,23 @@ struct SyncFitApp: App {
             return
         }
 
-        let previousUID = AuthenticationManager.lastAuthenticatedUserID
-        let switchedAccounts = previousUID != nil && previousUID != uid
+        // localDataOwnerUserID survives sign-out. Wipe whenever it does not match the
+        // signing-in UID — including nil (upgrade path / leftover data with no owner).
+        let localOwner = AuthenticationManager.localDataOwnerUserID
+        let mustWipeLocalCache = localOwner != uid
 
-        // Wipe device-local caches only when the authenticated Firebase UID changes.
-        if switchedAccounts {
+        if mustWipeLocalCache {
+            print("[AuthScope] Local cache owned by \(localOwner ?? "nil") — wiping for uid=\(uid)")
             dataStore.clearAllLocalUserData()
             coachService.resetForUserSwitch()
             chatService.teardown()
             appState.resetProfileForUserSwitch()
         }
-        AuthenticationManager.lastAuthenticatedUserID = uid
 
-        // Safety: if cloud calls hang, release the spinner after 10s so the app
-        // can still show local state instead of freezing forever.
+        AuthenticationManager.lastAuthenticatedUserID = uid
+        AuthenticationManager.localDataOwnerUserID = uid
+
+        // Safety: if cloud calls hang, release the spinner after 10s.
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             if appState.isRestoringSession {
@@ -148,7 +148,6 @@ struct SyncFitApp: App {
             let fetched = try await firestore.fetchUserProfileDetailed()
             let cloudProfile = fetched.profile
 
-            // Reject cloud docs that somehow belong to another UID.
             if !cloudProfile.ownerUserID.isEmpty, cloudProfile.ownerUserID != uid {
                 print("[AuthScope] Ignoring cloud profile owned by \(cloudProfile.ownerUserID) while signed in as \(uid)")
                 appState.resetProfileForUserSwitch()
@@ -158,43 +157,46 @@ struct SyncFitApp: App {
             // Full replace from users/{uid} — never keep leftover local height/weight/macros.
             appState.applyCloudProfile(cloudProfile)
 
-            // Restore program-setup + schedule so returning users skip
-            // "How do you want to start?" and keep their weekly plan.
-            let inferredProgramSetup = cloudProfile.hasCompletedProgramSetup
-                || !dataStore.routines.isEmpty
-                || dataStore.weekSchedule.days.contains(where: { $0.kind != .unassigned })
+            // Program setup: trust cloud flag only. Never infer from leftover local routines
+            // (that was a contamination path). Same-user local schedule is fine to keep.
             dataStore.applyCloudProgramState(
-                hasCompletedProgramSetup: inferredProgramSetup,
+                hasCompletedProgramSetup: cloudProfile.hasCompletedProgramSetup,
                 workoutScheduleJSON: cloudProfile.workoutScheduleJSON
             )
 
-            // Stamp ownerUserID / program state on older docs for this UID.
+            // Backfill ownerUserID / body stats / program flag for older docs.
+            // Never push local schedule to cloud when we just wiped for a new account
+            // unless cloud already had a schedule (avoid polluting B with A's plan).
             if cloudProfile.hasCompletedOnboarding {
+                let scheduleJSON = cloudProfile.workoutScheduleJSON.isEmpty
+                    ? (mustWipeLocalCache ? "" : dataStore.persistedWorkoutScheduleJSON())
+                    : cloudProfile.workoutScheduleJSON
                 let needsBackfill = cloudProfile.ownerUserID.isEmpty
                     || fetched.missingBodyStatsInCloud
-                    || cloudProfile.hasCompletedProgramSetup != dataStore.hasCompletedProgramSetup
-                    || (cloudProfile.workoutScheduleJSON.isEmpty
-                        && !dataStore.persistedWorkoutScheduleJSON().isEmpty)
-                if needsBackfill {
+                    || (!cloudProfile.hasCompletedProgramSetup && dataStore.hasCompletedProgramSetup)
+                if needsBackfill || (!cloudProfile.workoutScheduleJSON.isEmpty && scheduleJSON != cloudProfile.workoutScheduleJSON) {
                     try? await firestore.saveUserProfile(
                         appState.profile,
                         hasCompletedOnboarding: true,
-                        hasCompletedProgramSetup: dataStore.hasCompletedProgramSetup,
-                        workoutScheduleJSON: dataStore.persistedWorkoutScheduleJSON()
+                        hasCompletedProgramSetup: dataStore.hasCompletedProgramSetup
+                            || cloudProfile.hasCompletedProgramSetup,
+                        workoutScheduleJSON: scheduleJSON.isEmpty ? nil : scheduleJSON
                     )
                 }
             }
 
             await coachService.syncCoachStatusFromCloud(profileName: appState.profile.name)
+            await coachService.hydratePortalProfileFromCloudIfNeeded()
 
             let data = try await firestore.fetchAllUserData()
-            dataStore.mergeCloudData(
+            // Always replace local logs with this UID's cloud history (no additive merge).
+            dataStore.replaceCloudData(
                 weights: data.weights,
                 meals: data.meals,
                 workouts: data.workouts
             )
             await coachService.refreshClientCoachConnection()
-            print("[AuthScope] Session restore complete onboarded=\(cloudProfile.hasCompletedOnboarding)")
+            print("[AuthScope] Session restore complete onboarded=\(cloudProfile.hasCompletedOnboarding) programSetup=\(dataStore.hasCompletedProgramSetup)")
         } catch {
             print("[AuthScope] syncUserSession failed: \(error)")
         }

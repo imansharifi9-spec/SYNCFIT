@@ -1871,6 +1871,30 @@ final class FitnessDataStore: ObservableObject {
         saveAndReload()
     }
 
+    /// Replaces local meal/workout/weight history with the authenticated user's cloud data.
+    /// Use on session restore so a previous account's logs cannot remain mixed in.
+    func replaceCloudData(
+        weights cloudWeights: [WeightEntry],
+        meals cloudMeals: [FoodEntry],
+        workouts cloudWorkouts: [WorkoutEntry]
+    ) {
+        deleteAllRecords(of: WorkoutRecord.self)
+        deleteAllRecords(of: FoodRecord.self)
+        deleteAllRecords(of: WeightRecord.self)
+
+        for entry in cloudWeights {
+            context.insert(WeightRecord(from: entry))
+        }
+        for entry in cloudMeals {
+            context.insert(FoodRecord(from: entry))
+        }
+        for entry in cloudWorkouts {
+            context.insert(WorkoutRecord(from: entry))
+        }
+
+        saveAndReload()
+    }
+
     /// Removes all locally cached data for the signed-out or previous account.
     /// Routines, schedules, workouts, nutrition, and progress are device-local and
     /// must be cleared whenever the authenticated Firebase user changes.
@@ -2335,12 +2359,14 @@ final class FitnessDataStore: ObservableObject {
     }
 
     var needsProgramOnboarding: Bool {
+        // After session restore, hasCompletedProgramSetup comes from this UID's cloud doc
+        // (or stays false for a wiped new account). Do not treat leftover local routines
+        // as "setup complete" — that was a cross-account contamination path.
         guard !hasCompletedProgramSetup else { return false }
-        // If the user already has a schedule or routines, never force program onboarding
-        // (that flow can wipe/replace the weekly plan).
-        if !routines.isEmpty { return false }
+        // Same-user safety: if this device already has a real schedule for the current
+        // owner, don't force the program flow (it can replace the weekly plan).
         if weekSchedule.days.contains(where: { $0.kind != .unassigned }) { return false }
-        return workouts.isEmpty
+        return true
     }
 
     var hasCompletedProgramSetup: Bool {

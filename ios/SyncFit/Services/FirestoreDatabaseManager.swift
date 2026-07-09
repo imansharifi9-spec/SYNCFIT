@@ -422,6 +422,14 @@ final class FirestoreDatabaseManager: ObservableObject {
             .filter(\.isListed)
     }
 
+    /// Loads the signed-in coach's own marketplace document (even if not live yet).
+    func fetchCoachProfile(coachFirestoreID: String) async throws -> CoachProfile? {
+        guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
+        let document = try await db.collection("coaches").document(coachFirestoreID).getDocument()
+        guard let data = document.data() else { return nil }
+        return decodeCoachProfile(from: data)
+    }
+
     func saveCoachClientConnection(_ connection: CoachClientConnection) async throws {
         guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
         let coachKey = connection.coachFirestoreID

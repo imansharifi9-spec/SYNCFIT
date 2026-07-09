@@ -400,28 +400,76 @@ final class CoachService: NSObject, ObservableObject {
     }
 
     func performProfileSave() async {
-        guard profileSaveState != .saving, profileSaveState != .saved else { return }
+        guard profileSaveState != .saving else { return }
 
         profileSaveState = .saving
         print("[CoachSave] started")
 
         persistPortalProfileLocally()
 
-        profileSaveState = .saved
-        print("[CoachSave] local save complete — showing confirmation")
-
-        Task {
-            do {
-                try await uploadPortalProfileToCloud()
-            } catch {
-                print("[CoachSave] cloud error: \(error)")
+        do {
+            try await uploadPortalProfileToCloud()
+            profileSaveState = .saved
+            print("[CoachSave] local + cloud save complete")
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if profileSaveState == .saved {
+                profileSaveState = .idle
+            }
+        } catch {
+            print("[CoachSave] cloud error: \(error)")
+            profileSaveState = .error
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if profileSaveState == .error {
+                profileSaveState = .idle
             }
         }
+    }
 
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
+    /// Pulls text fields from `coaches/{uid}` into the portal when local editor is empty
+    /// or after an account switch. Photos remain device-local until Storage is wired.
+    func hydratePortalProfileFromCloudIfNeeded() async {
+        guard let firestore, isCoach else { return }
+        guard let uid = Auth.auth().currentUser?.uid else { return }
 
-        if profileSaveState == .saved {
-            profileSaveState = .idle
+        do {
+            guard let cloud = try await firestore.fetchCoachProfile(coachFirestoreID: uid) else {
+                return
+            }
+
+            let localEmpty = portalProfile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && portalProfile.about.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && portalProfile.specialties.isEmpty
+
+            // Always refresh listing/live flags from cloud; fill text when local is empty
+            // or when cloud has a richer name/about for this UID.
+            if localEmpty || cloud.name != portalProfile.name || cloud.bio != portalProfile.about {
+                portalProfile.coachUserID = uid
+                if portalProfile.id == UUID() || localEmpty {
+                    portalProfile.id = cloud.id
+                }
+                if localEmpty || portalProfile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    portalProfile.name = cloud.name
+                }
+                if localEmpty || portalProfile.about.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    portalProfile.about = cloud.bio
+                }
+                if localEmpty || portalProfile.specialties.isEmpty {
+                    portalProfile.specialties = cloud.specialties
+                }
+                if localEmpty {
+                    portalProfile.ratePerMonth = cloud.pricePerMonth
+                    portalProfile.availability = cloud.availability
+                    portalProfile.location = cloud.location
+                }
+            }
+
+            portalProfile.isLive = cloud.isLive
+            portalProfile.isListed = cloud.isListed
+            portalProfile.coachUserID = uid
+            persistSession()
+            print("[CoachAuth] Hydrated portal from coaches/\(uid)")
+        } catch {
+            print("[CoachAuth] Portal hydrate failed: \(error)")
         }
     }
 
