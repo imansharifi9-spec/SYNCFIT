@@ -362,21 +362,45 @@ final class FirestoreDatabaseManager: ObservableObject {
     // MARK: - Workouts
 
     func saveWorkout(_ entry: WorkoutEntry) async throws {
-        try await workoutsCollection()
-            .document(entry.id.uuidString)
-            .setData(workoutPayload(entry))
+        let path = "users/\(try userID())/workouts/\(entry.id.uuidString)"
+        print("[WorkoutSync] Writing \(path) exercise=\(entry.exercise.name) planned=\(entry.plannedSets.count) sets=\(entry.sets.count)")
+        do {
+            try await workoutsCollection()
+                .document(entry.id.uuidString)
+                .setData(workoutPayload(entry))
+            print("[WorkoutSync] Write OK \(path)")
+        } catch {
+            print("[WorkoutSync] Write FAILED \(path): \(error)")
+            throw error
+        }
     }
 
     func fetchWorkouts() async throws -> [WorkoutEntry] {
-        let snapshot = try await workoutsCollection()
-            .order(by: "date", descending: true)
-            .getDocuments()
-
-        return snapshot.documents.compactMap { decodeWorkout(from: $0.data()) }
+        let uid = try userID()
+        print("[WorkoutSync] Listing users/\(uid)/workouts")
+        do {
+            let snapshot = try await workoutsCollection()
+                .order(by: "date", descending: true)
+                .getDocuments()
+            let decoded = snapshot.documents.compactMap { decodeWorkout(from: $0.data()) }
+            print("[WorkoutSync] List OK count=\(decoded.count)")
+            return decoded
+        } catch {
+            print("[WorkoutSync] List FAILED users/\(uid)/workouts: \(error)")
+            throw error
+        }
     }
 
     func deleteWorkout(_ entry: WorkoutEntry) async throws {
-        try await workoutsCollection().document(entry.id.uuidString).delete()
+        let path = "users/\(try userID())/workouts/\(entry.id.uuidString)"
+        print("[WorkoutSync] Deleting \(path)")
+        do {
+            try await workoutsCollection().document(entry.id.uuidString).delete()
+            print("[WorkoutSync] Delete OK \(path)")
+        } catch {
+            print("[WorkoutSync] Delete FAILED \(path): \(error)")
+            throw error
+        }
     }
 
     func fetchAllUserData() async throws -> (weights: [WeightEntry], meals: [FoodEntry], workouts: [WorkoutEntry]) {
@@ -384,6 +408,48 @@ final class FirestoreDatabaseManager: ObservableObject {
         async let meals = fetchMeals()
         async let workouts = fetchWorkouts()
         return try await (weights, meals, workouts)
+    }
+
+    // MARK: - Routines (schedule content — referenced by customRoutineID)
+
+    func saveRoutine(_ routine: WorkoutRoutine) async throws {
+        let path = "users/\(try userID())/routines/\(routine.id.uuidString)"
+        print("[WorkoutSync] PART2 Writing routine content \(path) name=\(routine.name) exercises=\(routine.exercises.count)")
+        do {
+            try await routinesCollection()
+                .document(routine.id.uuidString)
+                .setData(routinePayload(routine))
+            print("[WorkoutSync] PART2 Write OK \(path)")
+        } catch {
+            print("[WorkoutSync] PART2 Write FAILED \(path): \(error)")
+            throw error
+        }
+    }
+
+    func fetchRoutines() async throws -> [WorkoutRoutine] {
+        let uid = try userID()
+        print("[WorkoutSync] Listing users/\(uid)/routines")
+        do {
+            let snapshot = try await routinesCollection().getDocuments()
+            let decoded = snapshot.documents.compactMap { decodeRoutine(from: $0.data()) }
+            print("[WorkoutSync] List routines OK count=\(decoded.count)")
+            return decoded
+        } catch {
+            print("[WorkoutSync] List routines FAILED users/\(uid)/routines: \(error)")
+            throw error
+        }
+    }
+
+    func deleteRoutine(_ routine: WorkoutRoutine) async throws {
+        let path = "users/\(try userID())/routines/\(routine.id.uuidString)"
+        print("[WorkoutSync] Deleting routine \(path)")
+        do {
+            try await routinesCollection().document(routine.id.uuidString).delete()
+            print("[WorkoutSync] Delete routine OK \(path)")
+        } catch {
+            print("[WorkoutSync] Delete routine FAILED \(path): \(error)")
+            throw error
+        }
     }
 
     // MARK: - Coaches marketplace
@@ -821,6 +887,10 @@ final class FirestoreDatabaseManager: ObservableObject {
         try userDocument().collection("workouts")
     }
 
+    private func routinesCollection() throws -> CollectionReference {
+        try userDocument().collection("routines")
+    }
+
     private func userID() throws -> String {
         guard let uid = Auth.auth().currentUser?.uid else {
             throw FirestoreDatabaseError.notAuthenticated
@@ -862,16 +932,74 @@ final class FirestoreDatabaseManager: ObservableObject {
             "exerciseID": entry.exercise.id.uuidString,
             "date": Timestamp(date: entry.date),
             "notes": entry.notes,
-            "sets": entry.sets.map { set in
-                [
-                    "id": set.id.uuidString,
-                    "reps": set.reps,
-                    "weight": set.weight,
-                    "rpe": set.rpe as Any
+            "sets": entry.sets.map { encodeSet($0) },
+            // Planned template sets for scheduled Custom days (often empty logged sets).
+            "plannedSets": entry.plannedSets.map { encodeSet($0) },
+            "updatedAt": FieldValue.serverTimestamp()
+        ]
+    }
+
+    private func encodeSet(_ set: WorkoutSet) -> [String: Any] {
+        [
+            "id": set.id.uuidString,
+            "reps": set.reps,
+            "weight": set.weight,
+            "rpe": set.rpe as Any
+        ]
+    }
+
+    private func routinePayload(_ routine: WorkoutRoutine) -> [String: Any] {
+        [
+            "id": routine.id.uuidString,
+            "name": routine.name,
+            "exercises": routine.sortedExercises.map { item -> [String: Any] in
+                var payload: [String: Any] = [
+                    "id": item.id.uuidString,
+                    "exerciseID": item.exercise.id.uuidString,
+                    "exerciseName": item.exercise.name,
+                    "muscleGroup": item.exercise.muscleGroup,
+                    "sortOrder": item.sortOrder,
+                    "plannedSetCount": item.plannedSetCount,
+                    "plannedReps": item.plannedReps
                 ]
+                if let weight = item.plannedWeight {
+                    payload["plannedWeight"] = weight
+                }
+                return payload
             },
             "updatedAt": FieldValue.serverTimestamp()
         ]
+    }
+
+    private func decodeRoutine(from data: [String: Any]) -> WorkoutRoutine? {
+        guard let idString = data["id"] as? String,
+              let id = UUID(uuidString: idString),
+              let name = data["name"] as? String else { return nil }
+
+        let exercisesData = data["exercises"] as? [[String: Any]] ?? []
+        let exercises = exercisesData.compactMap { item -> RoutineExerciseItem? in
+            guard let itemIDString = item["id"] as? String,
+                  let itemID = UUID(uuidString: itemIDString),
+                  let exerciseName = item["exerciseName"] as? String,
+                  let muscleGroup = item["muscleGroup"] as? String,
+                  let sortOrder = intValue(from: item["sortOrder"]) else { return nil }
+
+            let exerciseID = (item["exerciseID"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID()
+            let plannedSetCount = intValue(from: item["plannedSetCount"]) ?? 3
+            let plannedReps = intValue(from: item["plannedReps"]) ?? 8
+            let plannedWeight = doubleValue(from: item["plannedWeight"])
+
+            return RoutineExerciseItem(
+                id: itemID,
+                exercise: Exercise(id: exerciseID, name: exerciseName, muscleGroup: muscleGroup),
+                sortOrder: sortOrder,
+                plannedSetCount: plannedSetCount,
+                plannedReps: plannedReps,
+                plannedWeight: plannedWeight
+            )
+        }
+
+        return WorkoutRoutine(id: id, name: name, exercises: exercises)
     }
 
     // MARK: - Decoding
@@ -973,11 +1101,14 @@ final class FirestoreDatabaseManager: ObservableObject {
         let notes = data["notes"] as? String ?? ""
         let setsData = data["sets"] as? [[String: Any]] ?? []
         let sets = setsData.compactMap { decodeSet(from: $0) }
+        let plannedData = data["plannedSets"] as? [[String: Any]] ?? []
+        let plannedSets = plannedData.compactMap { decodeSet(from: $0) }
 
         return WorkoutEntry(
             id: id,
             exercise: Exercise(id: exerciseID, name: exerciseName, muscleGroup: muscleGroup),
             sets: sets,
+            plannedSets: plannedSets,
             date: date,
             notes: notes
         )

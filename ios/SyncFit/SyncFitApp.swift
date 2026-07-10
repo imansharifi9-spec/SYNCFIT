@@ -189,12 +189,18 @@ struct SyncFitApp: App {
             await coachService.hydratePortalProfileFromCloudIfNeeded()
 
             let data = try await firestore.fetchAllUserData()
+            let cloudRoutines = (try? await firestore.fetchRoutines()) ?? []
             // Always replace local logs with this UID's cloud history (no additive merge).
             dataStore.replaceCloudData(
                 weights: data.weights,
                 meals: data.meals,
-                workouts: data.workouts
+                workouts: data.workouts,
+                routines: cloudRoutines
             )
+            // Push any schedule-referenced routines that only existed locally, then
+            // rebuild empty day projections from those routine IDs.
+            dataStore.syncReferencedRoutinesToCloudIfNeeded()
+            dataStore.rehydrateScheduledDayPlansIfNeeded()
             await coachService.refreshClientCoachConnection()
             print("[AuthScope] Session restore complete onboarded=\(cloudProfile.hasCompletedOnboarding) programSetup=\(dataStore.hasCompletedProgramSetup)")
         } catch {

@@ -294,10 +294,15 @@ final class FitnessDataStore: ObservableObject {
     func assignRoutine(_ routine: WorkoutRoutine, toWeekday weekday: Int) {
         let matchedKind = WorkoutScheduleKind.matchingDayRoutine(named: routine.name) ?? .custom
         let assignment = WorkoutScheduleAssignment(kind: matchedKind, customRoutineID: routine.id)
+        print("[WorkoutSync] PART1 schedule slot weekday=\(weekday) kind=\(matchedKind.rawValue) customRoutineID=\(routine.id.uuidString) name=\(routine.name) exercises=\(routine.exercises.count)")
         if matchedKind != .custom {
             assignTemplateRoutine(routine, to: matchedKind)
         }
         setScheduleAssignment(assignment, forWeekday: weekday)
+
+        // Ensure the routine document the schedule points at exists in Firestore.
+        // Without this, PART1 (slot) can succeed while PART2 (content) is missing.
+        syncToFirestoreIfNeeded(label: "saveRoutine.assignSlot") { try await $0.saveRoutine(routine) }
 
         let targetDate = dateForWeekday(weekday)
         applyRoutineToDay(routine, on: targetDate)
@@ -895,6 +900,13 @@ final class FitnessDataStore: ObservableObject {
         sessionLabel: String? = nil
     ) {
         let dayStart = Calendar.current.startOfDay(for: date)
+        // PART2 content lives on the routine document (customRoutineID). Day workout
+        // rows are a derived projection for the Workouts tab UI.
+        print("[WorkoutSync] PART2 materialize day plan date=\(Self.dayKey(for: dayStart)) scheduleRoutineID=\(routine.id.uuidString) name=\(routine.name) exercises=\(routine.exercises.count)")
+        if routine.exercises.isEmpty {
+            print("[WorkoutSync] PART2 FAILED silently risk — routine \(routine.id.uuidString) has ZERO exercises; schedule slot will show Custom with empty day")
+        }
+
         clearNonManualWorkouts(on: dayStart)
 
         let entries = routine.sortedExercises.map { item in
@@ -910,8 +922,19 @@ final class FitnessDataStore: ObservableObject {
             for entry in entries {
                 context.insert(WorkoutRecord(from: entry))
             }
-            try? context.save()
-            workouts = fetchWorkouts()
+            do {
+                try context.save()
+                workouts = fetchWorkouts()
+                print("[WorkoutSync] PART2 local day rows saved date=\(Self.dayKey(for: dayStart)) count=\(entries.count) entryIDs=\(entries.map(\.id.uuidString).joined(separator: ","))")
+            } catch {
+                print("[WorkoutSync] PART2 local SwiftData save FAILED: \(error)")
+            }
+            // Also mirror planned day rows to Firestore workouts (logged/planned history).
+            for entry in entries {
+                syncToFirestoreIfNeeded(label: "saveWorkout.dayPlan") { try await $0.saveWorkout(entry) }
+            }
+        } else {
+            print("[WorkoutSync] PART2 no day rows — routine content empty date=\(Self.dayKey(for: dayStart)) routineID=\(routine.id.uuidString)")
         }
 
         setSessionLabel(sessionLabel ?? routine.name, for: date)
@@ -934,6 +957,9 @@ final class FitnessDataStore: ObservableObject {
             )
             if let record = try? context.fetch(descriptor).first {
                 context.delete(record)
+            }
+            syncToFirestoreIfNeeded(label: "deleteWorkout.clearDayPlan") {
+                try await $0.deleteWorkout(entry)
             }
         }
         try? context.save()
@@ -1423,11 +1449,15 @@ final class FitnessDataStore: ObservableObject {
     private func syncScheduleToCloudIfNeeded() {
         guard let firestore,
               let profileSettings = try? context.fetch(FetchDescriptor<AppSettings>()).first,
-              profileSettings.hasCompletedOnboarding else { return }
+              profileSettings.hasCompletedOnboarding else {
+            print("[WorkoutSync] Schedule cloud sync skipped — firestore/onboarding unavailable")
+            return
+        }
         let profile = profileSettings.profile
         let scheduleJSON = persistedWorkoutScheduleJSON()
         let programDone = profileSettings.hasCompletedProgramSetup
-        syncToFirestoreIfNeeded { db in
+        print("[WorkoutSync] Syncing schedule JSON to users/{uid} (\(scheduleJSON.count) chars)")
+        syncToFirestoreIfNeeded(label: "saveUserProfile.schedule") { db in
             try await db.saveUserProfile(
                 profile,
                 hasCompletedOnboarding: true,
@@ -1871,16 +1901,30 @@ final class FitnessDataStore: ObservableObject {
         saveAndReload()
     }
 
-    /// Replaces local meal/workout/weight history with the authenticated user's cloud data.
+    /// Replaces local meal/workout/weight/routine history with the authenticated user's cloud data.
     /// Use on session restore so a previous account's logs cannot remain mixed in.
     func replaceCloudData(
         weights cloudWeights: [WeightEntry],
         meals cloudMeals: [FoodEntry],
-        workouts cloudWorkouts: [WorkoutEntry]
+        workouts cloudWorkouts: [WorkoutEntry],
+        routines cloudRoutines: [WorkoutRoutine] = []
     ) {
         deleteAllRecords(of: WorkoutRecord.self)
         deleteAllRecords(of: FoodRecord.self)
         deleteAllRecords(of: WeightRecord.self)
+
+        // Only replace routines when cloud returned any — avoids wiping local library
+        // on a transient empty fetch for accounts that haven't synced routines yet.
+        if !cloudRoutines.isEmpty {
+            deleteAllRecords(of: WorkoutRoutineRecord.self)
+            deleteAllRecords(of: RoutineExerciseRecord.self)
+            for routine in cloudRoutines {
+                context.insert(WorkoutRoutineRecord(from: routine))
+            }
+            print("[WorkoutSync] Replaced local routines from cloud count=\(cloudRoutines.count) ids=\(cloudRoutines.map(\.id.uuidString).joined(separator: ","))")
+        } else {
+            print("[WorkoutSync] Cloud routines empty — keeping local routine library")
+        }
 
         for entry in cloudWeights {
             context.insert(WeightRecord(from: entry))
@@ -2015,7 +2059,7 @@ final class FitnessDataStore: ObservableObject {
         markWorkoutInProgress(for: normalized.date)
         saveAndReload()
         syncDayWorkoutIfNeeded(on: normalized.date)
-        syncToFirestoreIfNeeded { try await $0.saveWorkout(normalized) }
+        syncToFirestoreIfNeeded(label: "saveWorkout.add") { try await $0.saveWorkout(normalized) }
     }
 
     @discardableResult
@@ -2055,7 +2099,7 @@ final class FitnessDataStore: ObservableObject {
             set.workout = record
         }
 
-        syncToFirestoreIfNeeded { try await $0.saveWorkout(updated) }
+        syncToFirestoreIfNeeded(label: "saveWorkout.merge") { try await $0.saveWorkout(updated) }
         return true
     }
 
@@ -2164,7 +2208,7 @@ final class FitnessDataStore: ObservableObject {
                 syncDayWorkoutIfNeeded(on: date)
             }
             for entry in normalized {
-                syncToFirestoreIfNeeded { try await $0.saveWorkout(entry) }
+                syncToFirestoreIfNeeded(label: "saveWorkout.batch") { try await $0.saveWorkout(entry) }
             }
         }
     }
@@ -2177,7 +2221,7 @@ final class FitnessDataStore: ObservableObject {
         guard let record = try? context.fetch(descriptor).first else { return }
         context.delete(record)
         saveAndReload()
-        syncToFirestoreIfNeeded { try await $0.deleteWorkout(entry) }
+        syncToFirestoreIfNeeded(label: "deleteWorkout") { try await $0.deleteWorkout(entry) }
     }
 
     func deleteWorkouts(at offsets: IndexSet) {
@@ -2209,7 +2253,7 @@ final class FitnessDataStore: ObservableObject {
         }
 
         saveAndReload()
-        syncToFirestoreIfNeeded { try await $0.saveWorkout(entry) }
+        syncToFirestoreIfNeeded(label: "saveWorkout.update") { try await $0.saveWorkout(entry) }
     }
 
     func updateWorkoutPlan(_ entry: WorkoutEntry) {
@@ -2318,17 +2362,23 @@ final class FitnessDataStore: ObservableObject {
     }
 
     func addRoutine(_ routine: WorkoutRoutine) {
+        print("[WorkoutSync] PART2 addRoutine id=\(routine.id.uuidString) name=\(routine.name) exercises=\(routine.exercises.count)")
         let record = WorkoutRoutineRecord(from: routine)
         context.insert(record)
         saveAndReload()
+        syncToFirestoreIfNeeded(label: "saveRoutine.add") { try await $0.saveRoutine(routine) }
     }
 
     func updateRoutine(_ routine: WorkoutRoutine) {
+        print("[WorkoutSync] PART2 updateRoutine id=\(routine.id.uuidString) name=\(routine.name) exercises=\(routine.exercises.count)")
         let targetID = routine.id
         var descriptor = FetchDescriptor<WorkoutRoutineRecord>(
             predicate: #Predicate { $0.id == targetID }
         )
-        guard let record = try? context.fetch(descriptor).first else { return }
+        guard let record = try? context.fetch(descriptor).first else {
+            print("[WorkoutSync] PART2 updateRoutine FAILED — no local record for id=\(targetID.uuidString)")
+            return
+        }
 
         record.name = routine.name
 
@@ -2348,6 +2398,7 @@ final class FitnessDataStore: ObservableObject {
             exercise.routine = record
         }
         saveAndReload()
+        syncToFirestoreIfNeeded(label: "saveRoutine.update") { try await $0.saveRoutine(routine) }
     }
 
     func routine(with id: UUID) -> WorkoutRoutine? {
@@ -2470,6 +2521,7 @@ final class FitnessDataStore: ObservableObject {
 
     func deleteRoutine(_ routine: WorkoutRoutine) {
         let targetID = routine.id
+        print("[WorkoutSync] deleteRoutine id=\(targetID.uuidString)")
         unassignRoutineFromSchedule(routineID: targetID)
         removeDayTemplateLinks(forRoutineID: targetID)
 
@@ -2479,6 +2531,7 @@ final class FitnessDataStore: ObservableObject {
         guard let record = try? context.fetch(descriptor).first else { return }
         context.delete(record)
         saveAndReload()
+        syncToFirestoreIfNeeded(label: "deleteRoutine") { try await $0.deleteRoutine(routine) }
     }
 
     private func unassignRoutineFromSchedule(routineID: UUID) {
@@ -2618,10 +2671,64 @@ final class FitnessDataStore: ObservableObject {
         Task { await operation(healthKit) }
     }
 
-    private func syncToFirestoreIfNeeded(_ operation: @escaping (FirestoreDatabaseManager) async throws -> Void) {
-        guard let firestore else { return }
+    private func syncToFirestoreIfNeeded(
+        label: String = "firestore",
+        _ operation: @escaping (FirestoreDatabaseManager) async throws -> Void
+    ) {
+        guard let firestore else {
+            print("[WorkoutSync] \(label) skipped — Firestore unavailable")
+            return
+        }
         Task {
-            try? await operation(firestore)
+            do {
+                try await operation(firestore)
+                print("[WorkoutSync] \(label) succeeded")
+            } catch {
+                // Never swallow — silent try? hid permission / write failures.
+                print("[WorkoutSync] \(label) FAILED: \(error)")
+            }
+        }
+    }
+
+    /// After cloud history replace, rebuild empty scheduled days from routines
+    /// referenced by customRoutineID so Custom labels aren't blank.
+    func rehydrateScheduledDayPlansIfNeeded() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        for offset in 0..<7 {
+            guard let date = calendar.date(byAdding: .day, value: offset, to: today) else { continue }
+            let assignment = scheduledAssignment(for: date)
+            guard assignment.kind != .unassigned, assignment.kind != .rest else { continue }
+
+            if let slotID = assignment.customRoutineID {
+                let localMatch = routines.first(where: { $0.id == slotID })
+                print("[WorkoutSync] ID check day=\(Self.dayKey(for: date)) schedule.customRoutineID=\(slotID.uuidString) localRoutineFound=\(localMatch != nil) localExerciseCount=\(localMatch?.exercises.count ?? -1)")
+            }
+
+            guard let routine = scheduledRoutine(for: date) else {
+                print("[WorkoutSync] Rehydrate skipped — schedule points at missing routineID=\(assignment.customRoutineID?.uuidString ?? "nil") kind=\(assignment.kind.rawValue)")
+                continue
+            }
+            if workouts(on: date).isEmpty {
+                print("[WorkoutSync] Rehydrating empty day \(Self.dayKey(for: date)) from routineID=\(routine.id.uuidString) name=\(routine.name) exercises=\(routine.exercises.count)")
+                applyRoutineToDay(routine, on: date)
+            }
+        }
+        objectWillChange.send()
+    }
+
+    /// Push any local routines that the schedule references but may not be in Firestore yet.
+    func syncReferencedRoutinesToCloudIfNeeded() {
+        var ids = Set(weekSchedule.days.compactMap(\.customRoutineID))
+        ids.formUnion(dayTemplateRoutineIDs.values)
+        guard !ids.isEmpty else { return }
+        for id in ids {
+            guard let routine = routines.first(where: { $0.id == id }) else {
+                print("[WorkoutSync] Schedule references missing local routineID=\(id.uuidString)")
+                continue
+            }
+            print("[WorkoutSync] Backfilling routine content id=\(routine.id.uuidString) exercises=\(routine.exercises.count)")
+            syncToFirestoreIfNeeded(label: "saveRoutine.backfill") { try await $0.saveRoutine(routine) }
         }
     }
 
