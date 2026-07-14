@@ -11,10 +11,18 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // App writes coach_clients/{sorted(clientUid, coachUid)}.
+    // Firebase Auth UIDs never contain underscores, so split is safe.
     function connectionDocId(clientId, coachId) {
       return clientId <= coachId
         ? clientId + '_' + coachId
         : coachId + '_' + clientId;
+    }
+
+    function connectionIdIncludesUid(connectionId, uid) {
+      return connectionId is string
+        && connectionId.split('_').size() == 2
+        && uid in connectionId.split('_');
     }
 
     function coachClientConnection(clientId) {
@@ -23,50 +31,117 @@ service cloud.firestore {
       );
     }
 
+    // Active coach↔client edge for the signed-in coach.
+    // Missing status is treated as active (matches app decode default).
+    // Never read conn.data.status unless the key exists — missing fields error.
     function isActiveCoachForClient(clientId) {
       let conn = coachClientConnection(clientId);
-      return conn.exists
-        && conn.data.status == 'active'
-        && conn.data.coachId == request.auth.uid;
+      return isSignedIn()
+        && conn.exists
+        && conn.data.keys().hasAll(['coachId'])
+        && conn.data.coachId == request.auth.uid
+        && (
+          !conn.data.keys().hasAll(['status'])
+          || conn.data.status == 'active'
+        )
+        && (
+          (conn.data.keys().hasAll(['clientUserID']) && conn.data.clientUserID == clientId)
+          || (conn.data.keys().hasAll(['clientId']) && conn.data.clientId == clientId)
+        );
+    }
+
+    // Sharing toggles on coach_clients/{id}:
+    //   permissions: { workouts, nutrition, progress }  (preferred)
+    //   shareWorkouts / shareNutrition / shareProgress  (legacy flat)
+    // IMPORTANT: never read conn.data.permissions.X unless permissions is a map —
+    // a missing nested field errors and fails the whole allow expression.
+    function coachHasSharePermission(conn, permission) {
+      let hasMap = conn.data.keys().hasAll(['permissions'])
+        && conn.data.permissions is map;
+      let mapAllows = hasMap
+        && permission in conn.data.permissions
+        && conn.data.permissions[permission] == true;
+      let flatAllows =
+        (permission == 'workouts'
+          && conn.data.keys().hasAll(['shareWorkouts'])
+          && conn.data.shareWorkouts == true)
+        || (permission == 'nutrition'
+          && conn.data.keys().hasAll(['shareNutrition'])
+          && conn.data.shareNutrition == true)
+        || (permission == 'progress'
+          && conn.data.keys().hasAll(['shareProgress'])
+          && conn.data.shareProgress == true);
+      return mapAllows || flatAllows;
     }
 
     function coachCanReadClientData(clientId, permission) {
       let conn = coachClientConnection(clientId);
-      // Guard map access so a missing permissions field cannot throw and
-      // poison an `isOwner || coachCanRead…` evaluation for the owner path.
       return isActiveCoachForClient(clientId)
-        && conn.data.keys().hasAll(['permissions'])
-        && conn.data.permissions is map
-        && permission in conn.data.permissions
-        && conn.data.permissions[permission] == true;
+        && coachHasSharePermission(conn, permission);
     }
 
-    function isConversationParticipant() {
-      return isSignedIn() && request.auth.uid in resource.data.participants;
-    }
-
-    function createsOwnConversation() {
-      return isSignedIn()
+    // Chat — signed-in user must be one of the two participants on the doc.
+    function isConversationWriteAllowed() {
+      return request.auth != null
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 2
         && request.auth.uid in request.resource.data.participants
-        && request.resource.data.participants.size() == 2;
+        && request.resource.data.userId is string
+        && request.resource.data.coachId is string
+        && request.resource.data.userId != request.resource.data.coachId
+        && request.resource.data.userId in request.resource.data.participants
+        && request.resource.data.coachId in request.resource.data.participants
+        && (request.auth.uid == request.resource.data.userId
+          || request.auth.uid == request.resource.data.coachId);
     }
 
-    function isMessageThreadParticipant() {
-      return isSignedIn()
-        && request.auth.uid in get(
-          /databases/$(database)/documents/conversations/$(conversationId)
-        ).data.participants;
+    function isConversationReadAllowed() {
+      return request.auth != null
+        && resource.data.participants is list
+        && request.auth.uid in resource.data.participants;
+    }
+
+    // Doc id must be "{uidA}_{uidB}" in either order (app uses sorted join).
+    function conversationIdMatchesParties(conversationId) {
+      return conversationId == request.resource.data.userId + '_' + request.resource.data.coachId
+        || conversationId == request.resource.data.coachId + '_' + request.resource.data.userId;
+    }
+
+    // Conversation ids are "{uidA}_{uidB}" (Firebase UIDs have no underscores).
+    function uidInConversationId(conversationId) {
+      return request.auth != null
+        && conversationId is string
+        && conversationId.split('_').size() == 2
+        && request.auth.uid in conversationId.split('_');
+    }
+
+    // Legacy coach_messages: sender must be a named party; both UIDs required.
+    function canWriteLegacyCoachMessage() {
+      return request.auth != null
+        && request.resource.data.coachId is string
+        && request.resource.data.clientUserID is string
+        && request.resource.data.coachId != request.resource.data.clientUserID
+        && (request.auth.uid == request.resource.data.coachId
+          || request.auth.uid == request.resource.data.clientUserID);
     }
 
     // User profile and scoped logs — owner R/W; linked coach read-only by permission.
     match /users/{userId} {
       // Profile: any active coach may read (client portal needs name/targets).
-      // Subcollections below stay gated by share permissions.
+      //
+      // TODO(subscription): Lock `subscriptionStatus` / `subscriptionExpiresAt` writes to
+      // Cloud Functions only once server-side StoreKit receipt verification ships. Until
+      // then, the client (SubscriptionManager) may write those fields as owner.
+      //
+      // TODO(subscription): Firestore cannot hide individual fields on a readable doc.
+      // Coaches who pass isActiveCoachForClient currently receive the whole users/{uid}
+      // document including subscription fields. For true owner-only read of subscription
+      // data, move those fields to users/{userId}/private/subscription (or similar) and
+      // allow read: if isOwner(userId) only.
       allow read: if isOwner(userId) || isActiveCoachForClient(userId);
       allow create, update, delete: if isOwner(userId);
 
       match /weights/{docId} {
-        // Owner first (path-only) so list/listen never depends on coach get().
         allow read, write: if isOwner(userId);
         allow read: if coachCanReadClientData(userId, 'progress');
       }
@@ -77,14 +152,17 @@ service cloud.firestore {
       }
 
       match /workouts/{docId} {
-        // Owner create/update/delete/list — path uid must match auth.uid.
-        // Explicit write ops (not only read) so scheduled day-plan docs can persist.
         allow get, list, create, update, delete: if isOwner(userId);
-        allow read: if coachCanReadClientData(userId, 'workouts');
+        allow get, list: if coachCanReadClientData(userId, 'workouts');
+      }
+
+      // Progress photo metadata (image bytes live in Firebase Storage).
+      match /progress_photos/{docId} {
+        allow get, list, create, update, delete: if isOwner(userId);
+        allow get, list: if coachCanReadClientData(userId, 'progress');
       }
 
       // Routine library — schedule slots store customRoutineID pointing here.
-      // This is the PART2 content write for Custom days.
       match /routines/{docId} {
         allow get, list, create, update, delete: if isOwner(userId);
       }
@@ -121,7 +199,12 @@ service cloud.firestore {
         && coachId == request.auth.uid
         && request.resource.data.coachId == request.auth.uid;
 
-      allow update, delete: if isSignedIn()
+      allow update: if isSignedIn()
+        && coachId == request.auth.uid
+        && resource.data.coachId == request.auth.uid
+        && request.resource.data.coachId == request.auth.uid;
+
+      allow delete: if isSignedIn()
         && coachId == request.auth.uid
         && resource.data.coachId == request.auth.uid;
 
@@ -132,65 +215,81 @@ service cloud.firestore {
 
     // Coach ↔ client connections. Only participants may create/update their own edge.
     match /coach_clients/{connectionId} {
-      allow read: if isSignedIn()
+      // CRITICAL: gets on a missing doc still evaluate this rule with resource == null.
+      // `resource.data.coachId` errors → deny, which blocked ensureCanonical from
+      // discovering the doc was missing and creating the canonical edge.
+      // Allow get when the sorted id names the signed-in user (client or coach).
+      allow get: if isSignedIn()
+        && connectionIdIncludesUid(connectionId, request.auth.uid)
+        && (
+          !exists(/databases/$(database)/documents/coach_clients/$(connectionId))
+          || request.auth.uid == resource.data.coachId
+          || request.auth.uid == resource.data.clientId
+          || request.auth.uid == resource.data.clientUserID
+        );
+
+      allow list: if isSignedIn()
         && (request.auth.uid == resource.data.coachId
           || request.auth.uid == resource.data.clientId
           || request.auth.uid == resource.data.clientUserID);
 
-      // Only the client may create the connection (hire flow). Coaches must not
-      // self-attach to arbitrary client UIDs.
+      // Client hire flow OR coach repair of the canonical sorted-id doc.
+      // Both parties must be named; doc id must match sorted(client, coach).
       allow create: if isSignedIn()
         && request.resource.data.coachId is string
         && request.resource.data.clientUserID is string
         && request.resource.data.clientId is string
         && request.resource.data.clientId == request.resource.data.clientUserID
-        && request.auth.uid == request.resource.data.clientUserID
         && connectionId == connectionDocId(
           request.resource.data.clientUserID,
           request.resource.data.coachId
+        )
+        && (
+          request.auth.uid == request.resource.data.clientUserID
+          || request.auth.uid == request.resource.data.coachId
         );
 
       allow update: if isSignedIn()
         && (request.auth.uid == resource.data.clientId
           || request.auth.uid == resource.data.clientUserID
-          || request.auth.uid == resource.data.coachId)
-        && request.resource.data.coachId == resource.data.coachId
+          || request.auth.uid == resource.data.coachId
+          || (
+            request.auth.uid == request.resource.data.coachId
+            && connectionIdIncludesUid(connectionId, request.auth.uid)
+          ))
         && request.resource.data.clientUserID == resource.data.clientUserID
-        && request.resource.data.clientId == resource.data.clientId;
+        && request.resource.data.clientId == resource.data.clientId
+        && (
+          request.resource.data.coachId == resource.data.coachId
+          || request.resource.data.coachId == request.auth.uid
+        );
 
       allow delete: if false;
     }
 
-    // Chat threads — only listed participants.
+    // Chat threads — ONLY participants listed on the conversation doc.
     match /conversations/{conversationId} {
-      allow read: if isConversationParticipant();
+      allow read: if isConversationReadAllowed();
 
-      allow create: if createsOwnConversation()
-        && request.resource.data.userId is string
-        && request.resource.data.coachId is string
-        && request.auth.uid in [
-          request.resource.data.userId,
-          request.resource.data.coachId
-        ]
-        && conversationId == connectionDocId(
-          request.resource.data.userId,
-          request.resource.data.coachId
-        );
+      allow create: if isConversationWriteAllowed()
+        && conversationIdMatchesParties(conversationId);
 
-      // Participants cannot rewrite the membership edge.
-      allow update: if isConversationParticipant()
-        && request.resource.data.participants == resource.data.participants
+      allow update: if isConversationReadAllowed()
+        && isConversationWriteAllowed()
+        && conversationIdMatchesParties(conversationId)
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.coachId == resource.data.coachId;
 
-      match /messages/{messageId} {
-        allow read: if isMessageThreadParticipant();
+      allow delete: if false;
 
-        allow create: if isMessageThreadParticipant()
+      match /messages/{messageId} {
+        allow read: if uidInConversationId(conversationId);
+
+        allow create: if uidInConversationId(conversationId)
+          && request.resource.data.senderId is string
           && request.resource.data.senderId == request.auth.uid;
 
-        // Participants may update read receipts / routine-card payload fields.
-        allow update: if isMessageThreadParticipant()
+        allow update: if uidInConversationId(conversationId)
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['isRead', 'routineCardJSON', 'text']);
 
@@ -198,17 +297,15 @@ service cloud.firestore {
       }
     }
 
-    // Legacy coach messages collection — sender must be a named party.
+    // Legacy coach messages — both parties required; no anonymous forge.
     match /coach_messages/{messageId} {
       allow read: if isSignedIn()
+        && resource.data.coachId is string
+        && resource.data.clientUserID is string
         && (request.auth.uid == resource.data.coachId
           || request.auth.uid == resource.data.clientUserID);
 
-      allow create: if isSignedIn()
-        && request.resource.data.coachId is string
-        && request.resource.data.clientUserID is string
-        && (request.auth.uid == request.resource.data.coachId
-          || request.auth.uid == request.resource.data.clientUserID);
+      allow create: if canWriteLegacyCoachMessage();
 
       allow update, delete: if false;
     }

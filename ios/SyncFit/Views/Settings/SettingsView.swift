@@ -5,6 +5,8 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var authManager: AuthenticationManager
     @EnvironmentObject private var coachService: CoachService
+    @EnvironmentObject private var chatService: CoachChatService
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @State private var showingSignOutConfirm = false
     @State private var showingEditProfile = false
     @State private var showingCoachLogin = false
@@ -105,6 +107,15 @@ struct SettingsView: View {
                         Text("Subscription")
                             .font(.headline)
                         settingsRow("Plan", value: appState.isSyncFitPlusSubscriber ? "SyncFit+" : "Free")
+                        if subscriptionManager.hasPendingFirestoreSync {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Finishing setup…")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                         Button(appState.isSyncFitPlusSubscriber ? "Manage \(SyncFitPlusBrand.name)" : SyncFitPlusBrand.upgradeButton) {
                             appState.presentSyncFitPlusUpgrade()
                         }
@@ -170,6 +181,7 @@ struct SettingsView: View {
                             MyCoachCard(
                                 coach: hiredCoach,
                                 connection: connection,
+                                hasUnreadMessage: chatService.hasUnreadMessage(fromCoachId: hiredCoach.coachFirestoreID),
                                 onMessage: { openCoachChat(coach: hiredCoach) },
                                 onOpenProfile: { selectedCoachProfile = hiredCoach }
                             )

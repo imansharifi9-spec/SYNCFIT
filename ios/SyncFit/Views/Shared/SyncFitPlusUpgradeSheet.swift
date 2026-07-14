@@ -2,10 +2,13 @@ import SwiftUI
 
 struct SyncFitPlusUpgradeSheet: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
 
     var highlight: SyncFitPlusFeature = .general
+    @State private var isPurchasing = false
+    @State private var purchaseError: String?
 
     var body: some View {
         NavigationStack {
@@ -14,13 +17,37 @@ struct SyncFitPlusUpgradeSheet: View {
                     header
                     featuresCard
                     pricingCard
-                    Button(SyncFitPlusBrand.upgradeButton) {
-                        appState.presentSyncFitPlusUpgradeConfirmed()
-                        dismiss()
+                    Button {
+                        Task { await purchaseSyncFitPlus() }
+                    } label: {
+                        if isPurchasing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text(SyncFitPlusBrand.upgradeButton)
+                        }
                     }
                     .buttonStyle(PrimaryButtonStyle())
+                    .disabled(isPurchasing)
 
-                    Text("Payment integration coming soon. Preview unlocks SyncFit+ on this device.")
+                    if let purchaseError {
+                        Text(purchaseError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .multilineTextAlignment(.center)
+                    }
+
+                    if subscriptionManager.hasPendingFirestoreSync {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Finishing setup…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text("$9.99/month · Cancel anytime. Local StoreKit testing uses SyncFit.storekit.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -39,6 +66,29 @@ struct SyncFitPlusUpgradeSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .task {
+            if subscriptionManager.products.isEmpty {
+                await subscriptionManager.loadProducts()
+            }
+        }
+    }
+
+    private func purchaseSyncFitPlus() async {
+        isPurchasing = true
+        purchaseError = nil
+        defer { isPurchasing = false }
+        do {
+            try await subscriptionManager.purchase()
+            // Purchase already confirmed by StoreKit — don't block on Firestore sync.
+            // If sync is still pending, keep a subtle "Finishing setup…" indicator;
+            // dismiss anyway so the buy flow doesn't feel broken.
+            if subscriptionManager.isSubscribed, !subscriptionManager.hasPendingFirestoreSync {
+                dismiss()
+            }
+        } catch {
+            purchaseError = error.localizedDescription
+            print("[Subscription] Upgrade sheet purchase FAILED: \(error)")
+        }
     }
 
     private var header: some View {

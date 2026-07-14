@@ -13,6 +13,7 @@ struct SyncFitApp: App {
     @StateObject private var firestore: FirestoreDatabaseManager
     @StateObject private var coachService: CoachService
     @StateObject private var chatService: CoachChatService
+    @StateObject private var subscriptionManager = SubscriptionManager()
 
     init() {
         FirebaseConfiguration.configureIfNeeded()
@@ -51,15 +52,21 @@ struct SyncFitApp: App {
                 .environmentObject(firestore)
                 .environmentObject(coachService)
                 .environmentObject(chatService)
+                .environmentObject(subscriptionManager)
                 .task {
                     configureIntegrations()
+                    subscriptionManager.start()
                     if authManager.isAuthenticated {
                         await syncUserSession()
+                        await subscriptionManager.recheckEntitlementsAfterLogin()
                     }
                 }
                 .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
                     if isAuthenticated {
-                        Task { await syncUserSession() }
+                        Task {
+                            await syncUserSession()
+                            await subscriptionManager.recheckEntitlementsAfterLogin()
+                        }
                     } else if authManager.hasResolvedInitialAuthState {
                         handleUserSignedOut()
                     }
@@ -81,6 +88,7 @@ struct SyncFitApp: App {
         dataStore.firestore = firestore
         coachService.configure(firestore: firestore)
         coachService.seedFromLocalStore(dataStore.coaches)
+        subscriptionManager.configure(firestore: firestore, appState: appState)
         dataStore.isHealthSyncEnabled = { [weak appState] in
             appState?.appleHealthSyncEnabled ?? false
         }
@@ -99,6 +107,7 @@ struct SyncFitApp: App {
         AuthenticationManager.clearLastAuthenticatedUserID()
         coachService.resetForUserSwitch()
         chatService.teardown()
+        subscriptionManager.resetForLogout()
         appState.prepareForSignedOutState()
     }
 
@@ -197,6 +206,10 @@ struct SyncFitApp: App {
                 workouts: data.workouts,
                 routines: cloudRoutines
             )
+            // Progress photos: merge cloud metadata (images load from Storage / local cache).
+            if let cloudPhotos = try? await firestore.fetchProgressPhotos() {
+                dataStore.mergeCloudProgressPhotos(cloudPhotos)
+            }
             // Push any schedule-referenced routines that only existed locally, then
             // rebuild empty day projections from those routine IDs.
             dataStore.syncReferencedRoutinesToCloudIfNeeded()

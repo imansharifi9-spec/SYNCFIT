@@ -23,6 +23,8 @@ struct FirestoreUserProfile: Codable {
     var ownerUserID: String
     var isCoach: Bool
     var coachActivatedAt: Date?
+    var photoFileName: String?
+    var photoURL: String?
 
     static let empty = FirestoreUserProfile(
         hasCompletedOnboarding: false,
@@ -44,7 +46,9 @@ struct FirestoreUserProfile: Codable {
         workoutScheduleJSON: "",
         ownerUserID: "",
         isCoach: false,
-        coachActivatedAt: nil
+        coachActivatedAt: nil,
+        photoFileName: nil,
+        photoURL: nil
     )
 
     func asUserProfile() -> UserProfile {
@@ -63,6 +67,8 @@ struct FirestoreUserProfile: Codable {
         profile.measurementSystem = MeasurementSystem(rawValue: measurementSystemRaw) ?? .imperial
         profile.activityLevel = ActivityLevel(rawValue: activityLevelRaw) ?? .moderatelyActive
         profile.hasCoach = hasCoach
+        profile.photoFileName = photoFileName
+        profile.photoURL = photoURL
         return profile
     }
 }
@@ -178,7 +184,46 @@ final class FirestoreDatabaseManager: ObservableObject {
         if let workoutScheduleJSON {
             data["workoutScheduleJSON"] = workoutScheduleJSON
         }
+        if let photoFileName = profile.photoFileName, !photoFileName.isEmpty {
+            data["photoFileName"] = photoFileName
+        }
+        if let photoURL = profile.photoURL, !photoURL.isEmpty {
+            data["photoURL"] = photoURL
+        }
         try await userDocument().setData(data, merge: true)
+    }
+
+    /// Phase-1 client write of StoreKit entitlement mirror. Logged by SubscriptionManager.
+    /// TODO: After server-side receipt verification, move this write to Cloud Functions only.
+    func saveSubscriptionStatus(status: String, expiresAt: Date?) async throws {
+        let uid = try userID()
+        var data: [String: Any] = [
+            "subscriptionStatus": status,
+            "updatedAt": FieldValue.serverTimestamp()
+        ]
+        if let expiresAt {
+            data["subscriptionExpiresAt"] = Timestamp(date: expiresAt)
+        } else {
+            data["subscriptionExpiresAt"] = NSNull()
+        }
+        let path = "users/\(uid)"
+        print(
+            "[Subscription] FirestoreDatabaseManager.setData merge path=\(path) " +
+            "status=\(status) expiresAt=\(String(describing: expiresAt))"
+        )
+        do {
+            try await userDocument().setData(data, merge: true)
+            print("[Subscription] FirestoreDatabaseManager.setData OK path=\(path)")
+        } catch {
+            print("[Subscription] FirestoreDatabaseManager.setData FAILED path=\(path): \(error)")
+            throw error
+        }
+    }
+
+    /// Reads `subscriptionStatus` from `users/{uid}` for the signed-in user.
+    func fetchSubscriptionStatus() async throws -> String? {
+        let document = try await userDocument().getDocument()
+        return document.data()?["subscriptionStatus"] as? String
     }
 
     func fetchUserCoachStatus() async throws -> (isCoach: Bool, coachActivatedAt: Date?) {
@@ -456,8 +501,13 @@ final class FirestoreDatabaseManager: ObservableObject {
 
     func saveCoachProfile(_ profile: CoachProfile) async throws {
         guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
-        let coachDocumentID = profile.coachUserID ?? profile.id.uuidString
-        let data: [String: Any] = [
+        // Marketplace + security rules require the document ID to be the Auth UID.
+        // Never fall back to a random UUID — that path fails rules and never appears
+        // in other users' marketplace queries keyed by coachId/uid.
+        let authUID = try userID()
+        let coachDocumentID = authUID
+        let path = "coaches/\(coachDocumentID)"
+        var data: [String: Any] = [
             "id": profile.id.uuidString,
             "coachId": coachDocumentID,
             "name": profile.name,
@@ -476,29 +526,85 @@ final class FirestoreDatabaseManager: ObservableObject {
             "isListed": profile.isListed,
             "updatedAt": FieldValue.serverTimestamp()
         ]
-        try await db.collection("coaches").document(coachDocumentID).setData(data, merge: true)
+        if let photoFileName = profile.photoFileName, !photoFileName.isEmpty {
+            data["photoFileName"] = photoFileName
+        }
+        if let photoURL = profile.photoURL, !photoURL.isEmpty {
+            data["photoURL"] = photoURL
+        }
+        print("[CoachSave] Writing \(path) name=\(profile.name) isLive=\(profile.isLive) isListed=\(profile.isListed) specialties=\(profile.specialties) rate=\(profile.pricePerMonth)")
+        do {
+            try await db.collection("coaches").document(coachDocumentID).setData(data, merge: true)
+            print("[CoachSave] Write OK \(path)")
+        } catch {
+            print("[CoachSave] Write FAILED \(path): \(error)")
+            throw error
+        }
     }
 
     func fetchCoachProfiles() async throws -> [CoachProfile] {
         guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
-        let snapshot = try await db.collection("coaches")
-            .whereField("isLive", isEqualTo: true)
-            .getDocuments()
-        return snapshot.documents.compactMap { decodeCoachProfile(from: $0.data()) }
-            .filter(\.isListed)
+        print("[CoachSave] Listing coaches where isLive==true")
+        do {
+            let snapshot = try await db.collection("coaches")
+                .whereField("isLive", isEqualTo: true)
+                .getDocuments()
+            let decoded = snapshot.documents.compactMap { doc -> CoachProfile? in
+                let profile = decodeCoachProfile(from: doc.data())
+                if profile == nil {
+                    print("[CoachSave] Decode DROPPED coaches/\(doc.documentID) keys=\(Array(doc.data().keys).sorted())")
+                }
+                return profile
+            }
+            let listed = decoded.filter(\.isListed)
+            print("[CoachSave] List OK raw=\(snapshot.documents.count) decoded=\(decoded.count) listed=\(listed.count)")
+            return listed
+        } catch {
+            print("[CoachSave] List FAILED: \(error)")
+            throw error
+        }
     }
 
     /// Loads the signed-in coach's own marketplace document (even if not live yet).
     func fetchCoachProfile(coachFirestoreID: String) async throws -> CoachProfile? {
         guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
-        let document = try await db.collection("coaches").document(coachFirestoreID).getDocument()
-        guard let data = document.data() else { return nil }
-        return decodeCoachProfile(from: data)
+        let path = "coaches/\(coachFirestoreID)"
+        print("[CoachSave] Fetching \(path)")
+        do {
+            let document = try await db.collection("coaches").document(coachFirestoreID).getDocument()
+            guard let data = document.data() else {
+                print("[CoachSave] \(path) missing")
+                return nil
+            }
+            let profile = decodeCoachProfile(from: data)
+            if profile == nil {
+                print("[CoachSave] Decode DROPPED \(path) keys=\(Array(data.keys).sorted())")
+            } else {
+                print("[CoachSave] Fetch OK \(path) name=\(profile?.name ?? "")")
+            }
+            return profile
+        } catch {
+            print("[CoachSave] Fetch FAILED \(path): \(error)")
+            throw error
+        }
     }
 
     func saveCoachClientConnection(_ connection: CoachClientConnection) async throws {
         guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
         let coachKey = connection.coachFirestoreID
+        // Rules resolve the edge via get(coach_clients/{sorted(client, coachAuthUid)}).
+        // Always write to that canonical id so coach reads cannot miss a legacy doc.
+        let canonicalDocID = CoachClientConnection.makeDocumentID(
+            clientUserID: connection.clientUserID,
+            coachFirestoreID: coachKey
+        )
+        if connection.documentID != canonicalDocID {
+            print(
+                "[CoachClientData] Repairing connection doc id " +
+                "from=\(connection.documentID) to=\(canonicalDocID) " +
+                "client=\(connection.clientUserID) coach=\(coachKey)"
+            )
+        }
         let data: [String: Any] = [
             "coachId": coachKey,
             "clientId": connection.clientUserID,
@@ -518,9 +624,26 @@ final class FirestoreDatabaseManager: ObservableObject {
             "clientInitiatedContact": connection.clientInitiatedContact,
             "updatedAt": FieldValue.serverTimestamp()
         ]
-        try await db.collection("coach_clients")
-            .document(connection.documentID)
-            .setData(data, merge: true)
+        print(
+            "[CoachClientData] Saving coach_clients/\(canonicalDocID) " +
+            "permissions workouts=\(connection.shareWorkouts) " +
+            "nutrition=\(connection.shareNutrition) progress=\(connection.shareProgress)"
+        )
+        do {
+            try await db.collection("coach_clients")
+                .document(canonicalDocID)
+                .setData(data, merge: true)
+            // Best-effort cleanup of a legacy non-canonical doc so rules + queries agree.
+            if connection.documentID != canonicalDocID {
+                try? await db.collection("coach_clients")
+                    .document(connection.documentID)
+                    .delete()
+            }
+            print("[CoachClientData] Save OK coach_clients/\(canonicalDocID)")
+        } catch {
+            print("[CoachClientData] Save FAILED coach_clients/\(canonicalDocID): \(error)")
+            throw error
+        }
     }
 
     func fetchCoachClientConnections(coachFirestoreID: String) async throws -> [CoachClientConnection] {
@@ -560,55 +683,310 @@ final class FirestoreDatabaseManager: ObservableObject {
         return connection?.isActive == true ? connection : nil
     }
 
+    /// Ensures `coach_clients/{sorted(client, coachAuthUid)}` exists with the fields
+    /// security rules require. Skips rewrite when the canonical doc is already valid
+    /// so listener setup does not churn a write under active coach reads.
+    func ensureCanonicalCoachClientConnection(
+        from connection: CoachClientConnection,
+        coachAuthUID: String
+    ) async throws -> CoachClientConnection {
+        guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
+        let clientUID = connection.clientUserID
+        let canonicalID = CoachClientConnection.makeDocumentID(
+            clientUserID: clientUID,
+            coachFirestoreID: coachAuthUID
+        )
+        let canonicalRef = db.collection("coach_clients").document(canonicalID)
+
+        print("[CoachClientData] ensureCanonical path=coach_clients/\(canonicalID)")
+
+        // Prefer share flags from a readable legacy/list doc, then in-memory connection.
+        var source = connection
+        source.clientUserID = clientUID
+        source.coachFirestoreID = coachAuthUID
+        source.documentID = canonicalID
+        source.status = .active
+
+        // 1) Read the doc the coach already has in their clients list (known readable).
+        if connection.documentID != canonicalID, !connection.documentID.isEmpty {
+            do {
+                let legacy = try await db.collection("coach_clients")
+                    .document(connection.documentID)
+                    .getDocument()
+                if let data = legacy.data(),
+                   let decoded = decodeCoachClientConnection(from: data, documentID: legacy.documentID),
+                   decoded.isActive {
+                    print(
+                        "[CoachClientData] Loaded list doc=\(decoded.documentID) " +
+                        "shareW=\(decoded.shareWorkouts) shareN=\(decoded.shareNutrition) " +
+                        "shareP=\(decoded.shareProgress)"
+                    )
+                    source.shareWorkouts = decoded.shareWorkouts || source.shareWorkouts
+                    source.shareNutrition = decoded.shareNutrition || source.shareNutrition
+                    source.shareProgress = decoded.shareProgress || source.shareProgress
+                    if source.clientName.isEmpty { source.clientName = decoded.clientName }
+                    if source.coachName.isEmpty { source.coachName = decoded.coachName }
+                }
+            } catch {
+                print("[CoachClientData] Legacy doc read skipped: \(error.localizedDescription)")
+            }
+        }
+
+        // 2) Read canonical if it exists.
+        var canonicalReady = false
+        do {
+            let snap = try await canonicalRef.getDocument()
+            if let data = snap.data(),
+               let decoded = decodeCoachClientConnection(from: data, documentID: canonicalID),
+               decoded.isActive,
+               decoded.coachFirestoreID == coachAuthUID {
+                print(
+                    "[CoachClientData] Canonical EXISTS coachId=\(decoded.coachFirestoreID) " +
+                    "shareW=\(decoded.shareWorkouts) shareN=\(decoded.shareNutrition) " +
+                    "shareP=\(decoded.shareProgress) keys=\(Array(data.keys).sorted())"
+                )
+                if let permissions = data["permissions"] as? [String: Any] {
+                    print("[CoachClientData] Canonical permissions map=\(permissions)")
+                }
+                source.shareWorkouts = decoded.shareWorkouts || source.shareWorkouts
+                source.shareNutrition = decoded.shareNutrition || source.shareNutrition
+                source.shareProgress = decoded.shareProgress || source.shareProgress
+                if source.clientName.isEmpty { source.clientName = decoded.clientName }
+                if source.coachName.isEmpty { source.coachName = decoded.coachName }
+
+                let sharesOK = source.shareWorkouts || source.shareNutrition || source.shareProgress
+                let flagsMatchDoc =
+                    decoded.shareWorkouts == source.shareWorkouts
+                    && decoded.shareNutrition == source.shareNutrition
+                    && decoded.shareProgress == source.shareProgress
+                if sharesOK && flagsMatchDoc {
+                    print("[CoachClientData] Canonical already valid — skip rewrite")
+                    return decoded
+                }
+                canonicalReady = true
+            } else {
+                print("[CoachClientData] Canonical missing or coachId mismatch — will create/repair")
+            }
+        } catch {
+            print("[CoachClientData] Canonical get failed (will still write): \(error.localizedDescription)")
+        }
+
+        // 3) Write only when missing, wrong coachId, or share flags need repair.
+        print(
+            "[CoachClientData] Writing canonical (repair=\(canonicalReady)) shareW=\(source.shareWorkouts) " +
+            "shareN=\(source.shareNutrition) shareP=\(source.shareProgress)"
+        )
+        try await saveCoachClientConnection(source)
+
+        let live = try await fetchClientCoachConnection(
+            clientUserID: clientUID,
+            coachFirestoreID: coachAuthUID
+        ) ?? source
+
+        print(
+            "[CoachClientData] ensureCanonical DONE doc=\(live.documentID) " +
+            "coachId=\(live.coachFirestoreID) shareW=\(live.shareWorkouts) " +
+            "shareN=\(live.shareNutrition) shareP=\(live.shareProgress)"
+        )
+        return live
+    }
+
     func observeClientWorkouts(
         clientUserID: String,
-        onChange: @escaping ([WorkoutEntry]) -> Void
+        onChange: @escaping ([WorkoutEntry]) -> Void,
+        onError: ((Error) -> Void)? = nil
     ) -> ListenerRegistration? {
         guard let db else { return nil }
+        let path = "users/\(clientUserID)/workouts"
+        print("[CoachClientData] Listen START \(path) coach=\(Auth.auth().currentUser?.uid ?? "nil")")
         return db.collection("users").document(clientUserID).collection("workouts")
             .order(by: "date", descending: true)
-            .addSnapshotListener { snapshot, _ in
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    print("[CoachClientData] Listen FAILED \(path): \(error)")
+                    // Do not onChange([]) — teardown/cancel and transient denies were
+                    // wiping a successful snapshot and flashing an empty UI.
+                    onError?(error)
+                    return
+                }
                 let workouts = snapshot?.documents.compactMap { self.decodeWorkout(from: $0.data()) } ?? []
+                print("[CoachClientData] Listen OK \(path) count=\(workouts.count)")
                 onChange(workouts)
             }
     }
 
     func observeClientMeals(
         clientUserID: String,
-        onChange: @escaping ([FoodEntry]) -> Void
+        onChange: @escaping ([FoodEntry]) -> Void,
+        onError: ((Error) -> Void)? = nil
     ) -> ListenerRegistration? {
         guard let db else { return nil }
+        let path = "users/\(clientUserID)/meals"
+        print("[CoachClientData] Listen START \(path) coach=\(Auth.auth().currentUser?.uid ?? "nil")")
         return db.collection("users").document(clientUserID).collection("meals")
             .order(by: "date", descending: true)
-            .addSnapshotListener { snapshot, _ in
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    print("[CoachClientData] Listen FAILED \(path): \(error)")
+                    onError?(error)
+                    return
+                }
                 let meals = snapshot?.documents.compactMap { self.decodeMeal(from: $0.data()) } ?? []
+                print("[CoachClientData] Listen OK \(path) count=\(meals.count)")
                 onChange(meals)
             }
     }
 
     func observeClientWeights(
         clientUserID: String,
-        onChange: @escaping ([WeightEntry]) -> Void
+        onChange: @escaping ([WeightEntry]) -> Void,
+        onError: ((Error) -> Void)? = nil
     ) -> ListenerRegistration? {
         guard let db else { return nil }
+        let path = "users/\(clientUserID)/weights"
+        print("[CoachClientData] Listen START \(path) coach=\(Auth.auth().currentUser?.uid ?? "nil")")
         return db.collection("users").document(clientUserID).collection("weights")
             .order(by: "date", descending: true)
-            .addSnapshotListener { snapshot, _ in
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    print("[CoachClientData] Listen FAILED \(path): \(error)")
+                    onError?(error)
+                    return
+                }
                 let weights = snapshot?.documents.compactMap { self.decodeWeight(from: $0.data()) } ?? []
+                print("[CoachClientData] Listen OK \(path) count=\(weights.count)")
                 onChange(weights)
+            }
+    }
+
+    func observeClientProgressPhotos(
+        clientUserID: String,
+        onChange: @escaping ([ProgressPhotoEntry]) -> Void,
+        onError: ((Error) -> Void)? = nil
+    ) -> ListenerRegistration? {
+        guard let db else { return nil }
+        let path = "users/\(clientUserID)/progress_photos"
+        print("[CoachClientData] Listen START \(path) coach=\(Auth.auth().currentUser?.uid ?? "nil")")
+        return db.collection("users").document(clientUserID).collection("progress_photos")
+            .order(by: "date", descending: true)
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    print("[CoachClientData] Listen FAILED \(path): \(error)")
+                    onError?(error)
+                    return
+                }
+                let photos = snapshot?.documents.compactMap { self.decodeProgressPhoto(from: $0.data()) } ?? []
+                print("[CoachClientData] Listen OK \(path) count=\(photos.count)")
+                onChange(photos)
             }
     }
 
     func observeClientProfile(
         clientUserID: String,
-        onChange: @escaping (FirestoreUserProfile) -> Void
+        onChange: @escaping (FirestoreUserProfile) -> Void,
+        onError: ((Error) -> Void)? = nil
     ) -> ListenerRegistration? {
         guard let db else { return nil }
+        let path = "users/\(clientUserID)"
+        print("[CoachClientData] Listen START \(path) coach=\(Auth.auth().currentUser?.uid ?? "nil")")
         return db.collection("users").document(clientUserID)
-            .addSnapshotListener { snapshot, _ in
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    print("[CoachClientData] Listen FAILED \(path): \(error)")
+                    onError?(error)
+                    return
+                }
                 let profile = snapshot?.data().map { self.decodeUserProfile(from: $0) } ?? .empty
+                print("[CoachClientData] Listen OK \(path) name=\(profile.profileName)")
                 onChange(profile)
             }
+    }
+
+    // MARK: - Progress photos (Firestore metadata)
+
+    func saveProgressPhotoMetadata(_ entry: ProgressPhotoEntry) async throws {
+        guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
+        let uid = try userID()
+        let path = "users/\(uid)/progress_photos/\(entry.id.uuidString)"
+        print("[ProgressPhoto] Writing metadata \(path)")
+        do {
+            try await db.collection("users").document(uid)
+                .collection("progress_photos")
+                .document(entry.id.uuidString)
+                .setData(progressPhotoPayload(entry), merge: true)
+            print("[ProgressPhoto] Metadata OK \(path)")
+        } catch {
+            print("[ProgressPhoto] Metadata FAILED \(path): \(error)")
+            throw error
+        }
+    }
+
+    func fetchProgressPhotos() async throws -> [ProgressPhotoEntry] {
+        guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
+        let uid = try userID()
+        let path = "users/\(uid)/progress_photos"
+        print("[ProgressPhoto] Listing \(path)")
+        do {
+            let snapshot = try await db.collection("users").document(uid)
+                .collection("progress_photos")
+                .order(by: "date", descending: true)
+                .getDocuments()
+            let photos = snapshot.documents.compactMap { decodeProgressPhoto(from: $0.data()) }
+            print("[ProgressPhoto] List OK count=\(photos.count)")
+            return photos
+        } catch {
+            print("[ProgressPhoto] List FAILED \(path): \(error)")
+            throw error
+        }
+    }
+
+    func deleteProgressPhotoMetadata(_ entry: ProgressPhotoEntry) async throws {
+        guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
+        let uid = try userID()
+        let path = "users/\(uid)/progress_photos/\(entry.id.uuidString)"
+        print("[ProgressPhoto] Deleting metadata \(path)")
+        do {
+            try await db.collection("users").document(uid)
+                .collection("progress_photos")
+                .document(entry.id.uuidString)
+                .delete()
+            print("[ProgressPhoto] Metadata delete OK \(path)")
+        } catch {
+            print("[ProgressPhoto] Metadata delete FAILED \(path): \(error)")
+            throw error
+        }
+    }
+
+    private func progressPhotoPayload(_ entry: ProgressPhotoEntry) -> [String: Any] {
+        var data: [String: Any] = [
+            "id": entry.id.uuidString,
+            "date": Timestamp(date: entry.date),
+            "fileName": entry.fileName,
+            "userId": entry.userId,
+            "updatedAt": FieldValue.serverTimestamp()
+        ]
+        if let url = entry.downloadURL, !url.isEmpty {
+            data["downloadURL"] = url
+        }
+        if let storagePath = entry.storagePath, !storagePath.isEmpty {
+            data["storagePath"] = storagePath
+        }
+        return data
+    }
+
+    private func decodeProgressPhoto(from data: [String: Any]) -> ProgressPhotoEntry? {
+        guard let idString = data["id"] as? String,
+              let id = UUID(uuidString: idString),
+              let fileName = data["fileName"] as? String,
+              let date = timestampDate(from: data["date"]) else { return nil }
+        return ProgressPhotoEntry(
+            id: id,
+            date: date,
+            fileName: fileName,
+            userId: data["userId"] as? String ?? "",
+            downloadURL: data["downloadURL"] as? String,
+            storagePath: data["storagePath"] as? String
+        )
     }
 
     // MARK: - Coach routine templates
@@ -740,18 +1118,22 @@ final class FirestoreDatabaseManager: ObservableObject {
 
     func saveCoachMessage(_ message: CoachMessage, coachFirestoreID: String, clientUserID: String?) async throws {
         guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
-        var data: [String: Any] = [
+        // Rules require both coachId and clientUserID on create.
+        guard let clientUserID, !clientUserID.isEmpty else {
+            print("[ChatSync] Legacy coach_messages write skipped — missing clientUserID")
+            throw FirestoreDatabaseError.notAuthenticated
+        }
+        let data: [String: Any] = [
             "id": message.id.uuidString,
             "conversationID": message.conversationID,
             "senderRole": message.senderRole.rawValue,
             "text": message.text,
             "sentAt": Timestamp(date: message.sentAt),
             "coachId": coachFirestoreID,
-            "coachID": coachFirestoreID
+            "coachID": coachFirestoreID,
+            "clientUserID": clientUserID
         ]
-        if let clientUserID {
-            data["clientUserID"] = clientUserID
-        }
+        print("[ChatSync] Legacy coach_messages write id=\(message.id.uuidString) coach=\(coachFirestoreID) client=\(clientUserID)")
         try await db.collection("coach_messages").document(message.id.uuidString).setData(data, merge: true)
     }
 
@@ -785,33 +1167,52 @@ final class FirestoreDatabaseManager: ObservableObject {
     }
 
     private func decodeCoachProfile(from data: [String: Any]) -> CoachProfile? {
-        guard let idString = data["id"] as? String,
-              let id = UUID(uuidString: idString),
-              let name = data["name"] as? String,
-              let specialty = data["specialty"] as? String,
-              let pricePerMonth = data["pricePerMonth"] as? Int,
-              let rating = data["rating"] as? Double,
+        // Firestore often returns Int64 / NSNumber — never require `as? Int` / `as? Double`.
+        guard let name = data["name"] as? String,
               let bio = data["bio"] as? String else { return nil }
+
+        let id = (data["id"] as? String).flatMap(UUID.init(uuidString:))
+            ?? (data["coachId"] as? String).flatMap { CoachAuthCrypto.stableCoachUUID(from: $0) }
+            ?? UUID()
+        let specialty = (data["specialty"] as? String)
+            ?? (data["specialties"] as? [String])?.first
+            ?? "General fitness"
+        let pricePerMonth = intValue(from: data["pricePerMonth"]) ?? 0
+        let rating = doubleValue(from: data["rating"]) ?? 5.0
 
         let availabilityRaw = data["availability"] as? String ?? CoachAvailability.online.rawValue
         let coachUserID = data["coachId"] as? String
+
+        let photoFileName = data["photoFileName"] as? String
+        let photoURL = data["photoURL"] as? String
+        let clientCount = intValue(from: data["clientCount"]) ?? 0
+        let reviewCount = intValue(from: data["reviewCount"]) ?? 0
+        let isOnline = data["isOnline"] as? Bool ?? true
+        let isVerified = data["isVerified"] as? Bool ?? true
+        let location = data["location"] as? String ?? ""
+        let specialties = data["specialties"] as? [String] ?? [specialty]
+        let isLive = data["isLive"] as? Bool ?? true
+        let isListed = data["isListed"] as? Bool ?? true
+        let availability = CoachAvailability(rawValue: availabilityRaw) ?? .online
 
         let profile = CoachProfile(
             id: id,
             name: name,
             specialty: specialty,
             pricePerMonth: pricePerMonth,
-            isOnline: data["isOnline"] as? Bool ?? true,
+            isOnline: isOnline,
             rating: rating,
             bio: bio,
-            clientCount: data["clientCount"] as? Int ?? 0,
-            reviewCount: data["reviewCount"] as? Int ?? 0,
-            isVerified: data["isVerified"] as? Bool ?? true,
-            availability: CoachAvailability(rawValue: availabilityRaw) ?? .online,
-            location: data["location"] as? String ?? "",
-            specialties: data["specialties"] as? [String] ?? [specialty],
-            isLive: data["isLive"] as? Bool ?? true,
-            isListed: data["isListed"] as? Bool ?? true,
+            clientCount: clientCount,
+            reviewCount: reviewCount,
+            isVerified: isVerified,
+            availability: availability,
+            location: location,
+            specialties: specialties,
+            photoFileName: photoFileName,
+            photoURL: photoURL,
+            isLive: isLive,
+            isListed: isListed,
             coachUserID: coachUserID
         )
         return profile.sanitizedForDisplay()
@@ -826,7 +1227,9 @@ final class FirestoreDatabaseManager: ObservableObject {
         guard !coachFirestoreID.isEmpty else { return nil }
 
         let permissions = data["permissions"] as? [String: Any]
-        let shareWorkouts = permissions?["workouts"] as? Bool ?? data["shareWorkouts"] as? Bool ?? true
+        // Default FALSE — matching security rules. A missing field must not look
+        // like "sharing enabled" in the coach UI while rules deny the read.
+        let shareWorkouts = permissions?["workouts"] as? Bool ?? data["shareWorkouts"] as? Bool ?? false
         let shareNutrition = permissions?["nutrition"] as? Bool ?? data["shareNutrition"] as? Bool ?? false
         let shareProgress = permissions?["progress"] as? Bool ?? data["shareProgress"] as? Bool ?? false
 
@@ -847,7 +1250,8 @@ final class FirestoreDatabaseManager: ObservableObject {
             shareNutrition: shareNutrition,
             shareProgress: shareProgress,
             status: status,
-            clientInitiatedContact: data["clientInitiatedContact"] as? Bool ?? false
+            clientInitiatedContact: data["clientInitiatedContact"] as? Bool ?? false,
+            documentID: documentID
         )
     }
 
@@ -1026,7 +1430,9 @@ final class FirestoreDatabaseManager: ObservableObject {
             workoutScheduleJSON: data["workoutScheduleJSON"] as? String ?? "",
             ownerUserID: data["ownerUserID"] as? String ?? "",
             isCoach: data["isCoach"] as? Bool ?? false,
-            coachActivatedAt: timestampDate(from: data["coachActivatedAt"])
+            coachActivatedAt: timestampDate(from: data["coachActivatedAt"]),
+            photoFileName: data["photoFileName"] as? String,
+            photoURL: data["photoURL"] as? String
         )
     }
 
@@ -1116,11 +1522,12 @@ final class FirestoreDatabaseManager: ObservableObject {
 
     private func decodeSet(from data: [String: Any]) -> WorkoutSet? {
         guard let idString = data["id"] as? String,
-              let id = UUID(uuidString: idString),
-              let reps = data["reps"] as? Int,
-              let weight = data["weight"] as? Double else { return nil }
+              let id = UUID(uuidString: idString) else { return nil }
+        // Firestore may store numbers as Int or Double depending on write path.
+        guard let reps = intValue(from: data["reps"]),
+              let weight = doubleValue(from: data["weight"]) else { return nil }
 
-        return WorkoutSet(id: id, reps: reps, weight: weight, rpe: data["rpe"] as? Int)
+        return WorkoutSet(id: id, reps: reps, weight: weight, rpe: intValue(from: data["rpe"]))
     }
 
     private func timestampDate(from value: Any?) -> Date? {

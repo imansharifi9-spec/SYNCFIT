@@ -87,6 +87,8 @@
 		A1000000000000000000007D /* CoachClientDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007D /* CoachClientDataView.swift */; };
 		A10000000000000000000081 /* CoachRoutineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000081 /* CoachRoutineModels.swift */; };
 		A10000000000000000000082 /* CoachRoutineViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000082 /* CoachRoutineViews.swift */; };
+		A10000000000000000000083 /* UserPhotoStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000083 /* UserPhotoStorage.swift */; };
+		A10000000000000000000084 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000084 /* SubscriptionManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -168,6 +170,9 @@
 		A2000000000000000000007D /* CoachClientDataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachClientDataView.swift; sourceTree = "<group>"; };
 		A20000000000000000000081 /* CoachRoutineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachRoutineModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000082 /* CoachRoutineViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachRoutineViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000083 /* UserPhotoStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPhotoStorage.swift; sourceTree = "<group>"; };
+		A20000000000000000000084 /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000085 /* SyncFit.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; name = SyncFit.storekit; path = SyncFit.storekit; sourceTree = "<group>"; };
 		A2000000000000000000007F /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		A20000000000000000000080 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -206,6 +211,7 @@
 				A20000000000000000000001 /* SyncFitApp.swift */,
 				A20000000000000000000002 /* AppState.swift */,
 				A20000000000000000000042 /* SyncFit.entitlements */,
+				A20000000000000000000085 /* SyncFit.storekit */,
 				A40000000000000000000004 /* Models */,
 				A40000000000000000000005 /* Services */,
 				A40000000000000000000006 /* Theme */,
@@ -258,6 +264,7 @@
 				A2000000000000000000007B /* CoachChatService.swift */,
 				A2000000000000000000007E /* CoachPlaceholderContent.swift */,
 				A20000000000000000000079 /* CoachAuthCrypto.swift */,
+				A20000000000000000000084 /* SubscriptionManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -378,6 +385,7 @@
 			children = (
 				A20000000000000000000015 /* SettingsView.swift */,
 				A20000000000000000000026 /* ProfileView.swift */,
+				A20000000000000000000083 /* UserPhotoStorage.swift */,
 				A20000000000000000000036 /* EditProfileSheet.swift */,
 				A20000000000000000000041 /* AppleHealthSettingsSection.swift */,
 			);
@@ -517,6 +525,7 @@
 				A10000000000000000000023 /* PeriodNavigator.swift in Sources */,
 				A10000000000000000000024 /* WorkoutRoutineSheets.swift in Sources */,
 				A10000000000000000000025 /* ProfileView.swift in Sources */,
+				A10000000000000000000083 /* UserPhotoStorage.swift in Sources */,
 				A10000000000000000000026 /* AIInsightService.swift in Sources */,
 				A10000000000000000000027 /* ExerciseCatalog.swift in Sources */,
 				A10000000000000000000028 /* ExerciseIllustrationView.swift in Sources */,
@@ -533,6 +542,7 @@
 				A10000000000000000000039 /* HealthKitService.swift in Sources */,
 				A10000000000000000000040 /* AppleHealthSettingsSection.swift in Sources */,
 				A10000000000000000000041 /* AuthenticationManager.swift in Sources */,
+				A10000000000000000000084 /* SubscriptionManager.swift in Sources */,
 				A10000000000000000000042 /* FirestoreDatabaseManager.swift in Sources */,
 				A10000000000000000000047 /* FirebaseConfiguration.swift in Sources */,
 				A10000000000000000000050 /* SignInWithAppleButton.swift in Sources */,

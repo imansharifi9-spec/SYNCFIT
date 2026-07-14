@@ -126,8 +126,13 @@ final class AppState: ObservableObject {
 
     /// Placeholder until StoreKit is wired — unlocks preview access on device.
     func presentSyncFitPlusUpgradeConfirmed() {
-        isSyncFitPlusSubscriber = true
+        setSyncFitPlusSubscriber(true)
         showingSyncFitPlusUpgrade = false
+    }
+
+    /// Driven by SubscriptionManager entitlement checks (StoreKit 2).
+    func setSyncFitPlusSubscriber(_ subscribed: Bool) {
+        isSyncFitPlusSubscriber = subscribed
         persist()
     }
 
