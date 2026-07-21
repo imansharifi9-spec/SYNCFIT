@@ -26,6 +26,9 @@ const {
   createStripeClient: createStripeWebhookClient,
 } = require("./stripeWebhook");
 const {
+  createCheckoutSessionForUid,
+} = require("./createCheckoutSession");
+const {
   resolveExerciseMediaForName,
   cleanupMismatchedExerciseMediaCache,
   MEDIA_LOGIC_VERSION,
@@ -268,6 +271,34 @@ const createCoachStripeAccount = onCall(
 );
 
 /**
+ * Client hires a coach through Stripe subscription Checkout.
+ * Body: { coachUid } — all pricing, account, and fee values come from Firestore.
+ */
+const createCheckoutSession = onCall(
+  {
+    secrets: [stripeSecretKey],
+    timeoutSeconds: 60,
+    memory: "256MiB",
+  },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError(
+        "unauthenticated",
+        "Sign in required to hire a coach."
+      );
+    }
+
+    return createCheckoutSessionForUid(
+      request.auth.uid,
+      request.data || {},
+      {
+        getStripe: () => createStripeWebhookClient(stripeSecretKey.value()),
+      }
+    );
+  }
+);
+
+/**
  * Stripe webhook (HTTP). Signature-verified; Admin SDK writes coach payout flags.
  * Configure Stripe to POST to this endpoint and set STRIPE_WEBHOOK_SECRET.
  */
@@ -299,6 +330,8 @@ module.exports = {
   generateClientInsightsForUid,
   createCoachStripeAccount,
   createCoachStripeAccountForUid,
+  createCheckoutSession,
+  createCheckoutSessionForUid,
   stripeWebhook,
   resolveExerciseMedia,
   resolveExerciseMediaForName,

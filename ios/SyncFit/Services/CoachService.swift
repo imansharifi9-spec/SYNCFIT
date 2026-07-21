@@ -3,6 +3,9 @@ import CoreLocation
 import SwiftData
 import FirebaseAuth
 import FirebaseFirestore
+import FirebaseFunctions
+import AuthenticationServices
+import UIKit
 
 enum CoachActivationResult {
     case success
@@ -17,6 +20,50 @@ enum CoachProfileSaveState: Equatable {
     case saving
     case saved
     case error
+}
+
+enum CoachHireCheckoutState: Equatable {
+    case idle
+    case creatingCheckout
+    case authenticating
+    case confirming
+    case confirmed
+    case canceled
+    case failed(String)
+}
+
+enum CoachCheckoutCallbackResult: Equatable {
+    case success
+    case canceled
+    case invalid
+}
+
+enum CoachCheckoutCallbackValidator {
+    static func result(for url: URL) -> CoachCheckoutCallbackResult {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme == "syncfit",
+              components.user == nil,
+              components.password == nil,
+              components.port == nil,
+              components.fragment == nil,
+              components.path.isEmpty || components.path == "/" else {
+            return .invalid
+        }
+
+        if components.host == "coach-checkout-cancel" {
+            return components.percentEncodedQuery == nil ? .canceled : .invalid
+        }
+
+        guard components.host == "coach-checkout-success",
+              let queryItems = components.queryItems,
+              queryItems.count == 1,
+              queryItems[0].name == "session_id",
+              let sessionID = queryItems[0].value,
+              !sessionID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .invalid
+        }
+        return .success
+    }
 }
 
 @MainActor
@@ -40,10 +87,17 @@ final class CoachService: NSObject, ObservableObject {
     @Published var clientConnections: [CoachClientConnection] = []
     @Published var routineTemplates: [CoachRoutineTemplate] = []
     @Published var userLocation: CLLocation?
+    @Published private(set) var hireCheckoutState: CoachHireCheckoutState = .idle
+    @Published private(set) var hireCheckoutCoachUID: String?
+    @Published private(set) var liveStripeChargesEnabled: [String: Bool] = [:]
 
     private let context: ModelContext
     private var firestore: FirestoreDatabaseManager?
     private var messageListeners: [String: ListenerRegistration] = [:]
+    private var stripeAvailabilityListeners: [String: ListenerRegistration] = [:]
+    private var coachSubscriptionListener: ListenerRegistration?
+    private var checkoutConfirmationTimeoutTask: Task<Void, Never>?
+    private var checkoutSession: ASWebAuthenticationSession?
     private let locationManager = CLLocationManager()
 
     init(context: ModelContext) {
@@ -342,6 +396,14 @@ final class CoachService: NSObject, ObservableObject {
         hiredCoachID = nil
         routineTemplates = []
         portalProfile = CoachPortalProfile()
+        checkoutSession?.cancel()
+        checkoutSession = nil
+        cancelCheckoutConfirmation()
+        stripeAvailabilityListeners.values.forEach { $0.remove() }
+        stripeAvailabilityListeners.removeAll()
+        liveStripeChargesEnabled.removeAll()
+        hireCheckoutCoachUID = nil
+        hireCheckoutState = .idle
         persistSession()
     }
 
@@ -476,6 +538,190 @@ final class CoachService: NSObject, ObservableObject {
     func setHiredCoach(_ coach: CoachProfile?) {
         hiredCoachID = coach?.id
         persistSession()
+    }
+
+    func observeStripeAvailability(for coach: CoachProfile) {
+        let coachUID = coach.coachFirestoreID
+        guard stripeAvailabilityListeners[coachUID] == nil, let firestore else { return }
+        liveStripeChargesEnabled[coachUID] = false
+        stripeAvailabilityListeners[coachUID] = firestore.observeCoachStripeChargesEnabled(
+            coachFirestoreID: coachUID,
+            onChange: { [weak self] enabled in
+                Task { @MainActor in
+                    self?.liveStripeChargesEnabled[coachUID] = enabled
+                }
+            },
+            onError: { [weak self] _ in
+                Task { @MainActor in
+                    self?.liveStripeChargesEnabled[coachUID] = false
+                }
+            }
+        )
+    }
+
+    func stopObservingStripeAvailability(coachUID: String) {
+        stripeAvailabilityListeners.removeValue(forKey: coachUID)?.remove()
+        liveStripeChargesEnabled.removeValue(forKey: coachUID)
+    }
+
+    func beginCoachCheckout(for coach: CoachProfile) async {
+        let coachUID = coach.coachFirestoreID
+        guard hireCheckoutState != .creatingCheckout,
+              hireCheckoutState != .authenticating,
+              hireCheckoutState != .confirming else { return }
+        guard Auth.auth().currentUser != nil else {
+            hireCheckoutCoachUID = coachUID
+            hireCheckoutState = .failed("Sign in to hire this coach.")
+            return
+        }
+        guard let firestore else {
+            hireCheckoutCoachUID = coachUID
+            hireCheckoutState = .failed("Checkout is unavailable. Please try again.")
+            return
+        }
+
+        cancelCheckoutConfirmation()
+        hireCheckoutCoachUID = coachUID
+        hireCheckoutState = .creatingCheckout
+
+        do {
+            let chargesEnabled = try await firestore.fetchCoachStripeChargesEnabled(
+                coachFirestoreID: coachUID
+            )
+            liveStripeChargesEnabled[coachUID] = chargesEnabled
+            guard chargesEnabled else {
+                hireCheckoutState = .failed("This coach is still completing setup.")
+                return
+            }
+
+            let result = try await Functions.functions()
+                .httpsCallable("createCheckoutSession")
+                .call(["coachUid": coachUID])
+            guard let response = result.data as? [String: Any],
+                  let rawURL = (response["url"] as? String) ?? (response["checkoutUrl"] as? String),
+                  let checkoutURL = URL(string: rawURL) else {
+                hireCheckoutState = .failed("Checkout couldn't be opened. Please try again.")
+                return
+            }
+            openCheckout(checkoutURL, coachUID: coachUID)
+        } catch {
+            if let chargesEnabled = try? await firestore.fetchCoachStripeChargesEnabled(
+                coachFirestoreID: coachUID
+            ), !chargesEnabled {
+                liveStripeChargesEnabled[coachUID] = false
+                hireCheckoutState = .failed("This coach is still completing setup.")
+                return
+            }
+            hireCheckoutState = .failed(error.localizedDescription)
+        }
+    }
+
+    func resetHireCheckoutMessage(for coachUID: String) {
+        guard hireCheckoutCoachUID == coachUID else { return }
+        switch hireCheckoutState {
+        case .canceled, .failed, .confirmed:
+            hireCheckoutState = .idle
+        default:
+            break
+        }
+    }
+
+    private func openCheckout(_ url: URL, coachUID: String) {
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callbackURLScheme: "syncfit"
+        ) { [weak self] callbackURL, error in
+            Task { @MainActor in
+                guard let self, self.hireCheckoutCoachUID == coachUID else { return }
+                self.checkoutSession = nil
+
+                if let authenticationError = error as? ASWebAuthenticationSessionError,
+                   authenticationError.code == .canceledLogin {
+                    self.hireCheckoutState = .canceled
+                    return
+                }
+                if let error {
+                    self.hireCheckoutState = .failed(error.localizedDescription)
+                    return
+                }
+                guard let callbackURL else {
+                    self.hireCheckoutState = .failed("Checkout couldn't be confirmed.")
+                    return
+                }
+                switch CoachCheckoutCallbackValidator.result(for: callbackURL) {
+                case .canceled:
+                    self.hireCheckoutState = .canceled
+                    return
+                case .invalid:
+                    self.hireCheckoutState = .failed("Checkout returned an invalid callback.")
+                    return
+                case .success:
+                    self.startCheckoutConfirmation(coachUID: coachUID)
+                }
+            }
+        }
+        session.presentationContextProvider = self
+        session.prefersEphemeralWebBrowserSession = false
+        checkoutSession = session
+        hireCheckoutState = .authenticating
+        if !session.start() {
+            checkoutSession = nil
+            hireCheckoutState = .failed("Checkout couldn't be opened. Please try again.")
+        }
+    }
+
+    private func startCheckoutConfirmation(coachUID: String) {
+        guard let clientUID = Auth.auth().currentUser?.uid, let firestore else {
+            hireCheckoutState = .failed("Sign in to confirm this checkout.")
+            return
+        }
+
+        cancelCheckoutConfirmation()
+        hireCheckoutState = .confirming
+        coachSubscriptionListener = firestore.observeActiveCoachSubscription(
+            clientUserID: clientUID,
+            coachFirestoreID: coachUID,
+            onActive: { [weak self] in
+                Task { @MainActor in
+                    guard let self, self.hireCheckoutCoachUID == coachUID else { return }
+                    self.cancelCheckoutConfirmation()
+                    await self.refreshClientCoachConnection()
+                    self.hireCheckoutState = .confirmed
+                }
+            },
+            onError: { [weak self] error in
+                Task { @MainActor in
+                    guard let self, self.hireCheckoutCoachUID == coachUID else { return }
+                    self.cancelCheckoutConfirmation()
+                    self.hireCheckoutState = .failed(error.localizedDescription)
+                }
+            }
+        )
+        guard coachSubscriptionListener != nil else {
+            hireCheckoutState = .failed("Checkout confirmation is unavailable.")
+            return
+        }
+
+        checkoutConfirmationTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 120_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self,
+                      self.hireCheckoutCoachUID == coachUID,
+                      self.hireCheckoutState == .confirming else { return }
+                self.cancelCheckoutConfirmation()
+                self.hireCheckoutState = .failed(
+                    "Checkout confirmation is taking longer than expected. Please try again."
+                )
+            }
+        }
+    }
+
+    private func cancelCheckoutConfirmation() {
+        coachSubscriptionListener?.remove()
+        coachSubscriptionListener = nil
+        checkoutConfirmationTimeoutTask?.cancel()
+        checkoutConfirmationTimeoutTask = nil
     }
 
     func hireCoach(
@@ -1009,4 +1255,14 @@ extension CoachService: CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
+}
+
+extension CoachService: ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+            ?? ASPresentationAnchor()
+    }
 }

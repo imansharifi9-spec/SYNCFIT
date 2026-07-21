@@ -258,7 +258,8 @@ service cloud.firestore {
           'stripeConnectedAccountId',
           'stripeChargesEnabled',
           'stripePayoutsEnabled',
-          'stripeUpdatedAt'
+          'stripeUpdatedAt',
+          'platformFeePercent'
         ]);
       }
 
@@ -268,8 +269,19 @@ service cloud.firestore {
             'stripeConnectedAccountId',
             'stripeChargesEnabled',
             'stripePayoutsEnabled',
-            'stripeUpdatedAt'
+            'stripeUpdatedAt',
+            'platformFeePercent'
           ]);
+      }
+
+      function coachStripeFieldsAbsentOnDelete() {
+        return !resource.data.keys().hasAny([
+          'stripeConnectedAccountId',
+          'stripeChargesEnabled',
+          'stripePayoutsEnabled',
+          'stripeUpdatedAt',
+          'platformFeePercent'
+        ]);
       }
 
       allow read: if isSignedIn();
@@ -287,7 +299,8 @@ service cloud.firestore {
 
       allow delete: if isSignedIn()
         && coachId == request.auth.uid
-        && resource.data.coachId == request.auth.uid;
+        && resource.data.coachId == request.auth.uid
+        && coachStripeFieldsAbsentOnDelete();
 
       match /routine_templates/{templateId} {
         allow read, write: if isSignedIn() && request.auth.uid == coachId;
@@ -299,8 +312,70 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Coach ↔ client connections. Only participants may create/update their own edge.
+    // Server-owned coach subscription records. Queries must constrain either
+    // clientUid or coachUid to the signed-in uid so every result is a participant.
+    match /coachSubscriptions/{subscriptionId} {
+      allow get, list: if isSignedIn()
+        && (resource.data.clientUid == request.auth.uid
+          || resource.data.coachUid == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    // Coach ↔ client connections. Server creates identity/lifecycle fields;
+    // the client participant may update only their data-sharing choices.
     match /coach_clients/{connectionId} {
+      function isValidClientSharingUpdate() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        return isSignedIn()
+          && request.auth.uid == resource.data.clientId
+          && request.auth.uid == resource.data.clientUserID
+          && resource.data.clientId == resource.data.clientUserID
+          && connectionId == connectionDocId(
+            resource.data.clientUserID,
+            resource.data.coachId
+          )
+          && changed.hasOnly([
+            'permissions',
+            'shareWorkouts',
+            'shareNutrition',
+            'shareProgress',
+            'updatedAt'
+          ])
+          && changed.hasAny([
+            'permissions',
+            'shareWorkouts',
+            'shareNutrition',
+            'shareProgress'
+          ])
+          && request.resource.data.permissions is map
+          && request.resource.data.permissions.keys().hasAll([
+            'workouts',
+            'nutrition',
+            'progress'
+          ])
+          && request.resource.data.permissions.keys().hasOnly([
+            'workouts',
+            'nutrition',
+            'progress'
+          ])
+          && request.resource.data.permissions.workouts is bool
+          && request.resource.data.permissions.nutrition is bool
+          && request.resource.data.permissions.progress is bool
+          && request.resource.data.shareWorkouts is bool
+          && request.resource.data.shareNutrition is bool
+          && request.resource.data.shareProgress is bool
+          && request.resource.data.permissions.workouts
+            == request.resource.data.shareWorkouts
+          && request.resource.data.permissions.nutrition
+            == request.resource.data.shareNutrition
+          && request.resource.data.permissions.progress
+            == request.resource.data.shareProgress
+          && (
+            !changed.hasAny(['updatedAt'])
+            || request.resource.data.updatedAt == request.time
+          );
+      }
+
       // CRITICAL: gets on a missing doc still evaluate this rule with resource == null.
       // `resource.data.coachId` errors → deny, which blocked ensureCanonical from
       // discovering the doc was missing and creating the canonical edge.
@@ -319,36 +394,10 @@ service cloud.firestore {
           || request.auth.uid == resource.data.clientId
           || request.auth.uid == resource.data.clientUserID);
 
-      // Client hire flow OR coach repair of the canonical sorted-id doc.
-      // Both parties must be named; doc id must match sorted(client, coach).
-      allow create: if isSignedIn()
-        && request.resource.data.coachId is string
-        && request.resource.data.clientUserID is string
-        && request.resource.data.clientId is string
-        && request.resource.data.clientId == request.resource.data.clientUserID
-        && connectionId == connectionDocId(
-          request.resource.data.clientUserID,
-          request.resource.data.coachId
-        )
-        && (
-          request.auth.uid == request.resource.data.clientUserID
-          || request.auth.uid == request.resource.data.coachId
-        );
+      // Paid connections are created only by the verified Stripe webhook via Admin SDK.
+      allow create: if false;
 
-      allow update: if isSignedIn()
-        && (request.auth.uid == resource.data.clientId
-          || request.auth.uid == resource.data.clientUserID
-          || request.auth.uid == resource.data.coachId
-          || (
-            request.auth.uid == request.resource.data.coachId
-            && connectionIdIncludesUid(connectionId, request.auth.uid)
-          ))
-        && request.resource.data.clientUserID == resource.data.clientUserID
-        && request.resource.data.clientId == resource.data.clientId
-        && (
-          request.resource.data.coachId == resource.data.coachId
-          || request.resource.data.coachId == request.auth.uid
-        );
+      allow update: if isValidClientSharingUpdate();
 
       allow delete: if false;
     }

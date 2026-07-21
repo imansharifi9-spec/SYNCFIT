@@ -40,7 +40,8 @@ struct CoachesView: View {
                         : coach.transformationPhotoFileNames,
                     isLive: coach.isLive,
                     isListed: coach.isListed,
-                    coachUserID: coach.coachUserID ?? existing.coachUserID
+                    coachUserID: coach.coachUserID ?? existing.coachUserID,
+                    stripeChargesEnabled: coach.stripeChargesEnabled
                 )
             } else if !merged.contains(where: { $0.name == coach.name }) {
                 merged.append(coach)

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9D7893822239E831EA17D964 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = B5F7F9F0CA39C29E98DC83AA /* FirebaseFunctions */; };
 		A10000000000000000000001 /* SyncFitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* SyncFitApp.swift */; };
 		A10000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppState.swift */; };
 		A10000000000000000000003 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* UserProfile.swift */; };
@@ -89,7 +90,18 @@
 		A10000000000000000000082 /* CoachRoutineViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000082 /* CoachRoutineViews.swift */; };
 		A10000000000000000000083 /* UserPhotoStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000083 /* UserPhotoStorage.swift */; };
 		A10000000000000000000084 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000084 /* SubscriptionManager.swift */; };
+		T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		T50000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A80000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A50000000000000000000001;
+			remoteInfo = SyncFit;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A20000000000000000000001 /* SyncFitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFitApp.swift; sourceTree = "<group>"; };
@@ -175,6 +187,8 @@
 		A20000000000000000000085 /* SyncFit.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; name = SyncFit.storekit; path = SyncFit.storekit; sourceTree = "<group>"; };
 		A2000000000000000000007F /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		A20000000000000000000080 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
+		T10000000000000000000002 /* SyncFitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SyncFitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachCheckoutCallbackValidatorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,6 +201,14 @@
 				A10000000000000000000044 /* FirebaseFirestore in Frameworks */,
 				A10000000000000000000045 /* FirebaseStorage in Frameworks */,
 				A10000000000000000000049 /* GoogleSignIn in Frameworks */,
+				9D7893822239E831EA17D964 /* FirebaseFunctions in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		T30000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -199,6 +221,7 @@
 				A2000000000000000000007F /* Config.xcconfig */,
 				A20000000000000000000080 /* Secrets.xcconfig.example */,
 				A40000000000000000000002 /* SyncFit */,
+				T20000000000000000000001 /* SyncFitTests */,
 				A40000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -225,6 +248,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000017 /* SyncFit.app */,
+				T10000000000000000000002 /* SyncFitTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -402,6 +426,14 @@
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		T20000000000000000000001 /* SyncFitTests */ = {
+			isa = PBXGroup;
+			children = (
+				T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */,
+			);
+			path = SyncFitTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -425,10 +457,31 @@
 				B60000000000000000000003 /* FirebaseFirestore */,
 				B60000000000000000000004 /* FirebaseStorage */,
 				B60000000000000000000005 /* GoogleSignIn */,
+				B5F7F9F0CA39C29E98DC83AA /* FirebaseFunctions */,
 			);
 			productName = SyncFit;
 			productReference = A20000000000000000000017 /* SyncFit.app */;
 			productType = "com.apple.product-type.application";
+		};
+		T40000000000000000000001 /* SyncFitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = T70000000000000000000001 /* Build configuration list for PBXNativeTarget "SyncFitTests" */;
+			buildPhases = (
+				T30000000000000000000001 /* Sources */,
+				T30000000000000000000002 /* Frameworks */,
+				T30000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				T50000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = SyncFitTests;
+			packageProductDependencies = (
+			);
+			productName = SyncFitTests;
+			productReference = T10000000000000000000002 /* SyncFitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -442,6 +495,10 @@
 				TargetAttributes = {
 					A50000000000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					T40000000000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = A50000000000000000000001;
 					};
 				};
 			};
@@ -463,6 +520,7 @@
 			projectRoot = "";
 			targets = (
 				A50000000000000000000001 /* SyncFit */,
+				T40000000000000000000001 /* SyncFitTests */,
 			);
 		};
 /* End PBXProject section */
@@ -474,6 +532,13 @@
 			files = (
 				A10000000000000000000016 /* Assets.xcassets in Resources */,
 				A10000000000000000000048 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		T30000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -579,7 +644,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		T30000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		T50000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A50000000000000000000001 /* SyncFit */;
+			targetProxy = T50000000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A90000000000000000000001 /* Debug */ = {
@@ -764,6 +845,50 @@
 			};
 			name = Release;
 		};
+		T60000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2DMDU95WTV;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.syncfit.SyncFitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SyncFit.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SyncFit";
+			};
+			name = Debug;
+		};
+		T60000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2DMDU95WTV;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.syncfit.SyncFitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SyncFit.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SyncFit";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -781,6 +906,15 @@
 			buildConfigurations = (
 				A90000000000000000000003 /* Debug */,
 				A90000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		T70000000000000000000001 /* Build configuration list for PBXNativeTarget "SyncFitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				T60000000000000000000001 /* Debug */,
+				T60000000000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -807,6 +941,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B5F7F9F0CA39C29E98DC83AA /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B60000000000000000000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
+		};
 		B60000000000000000000001 /* FirebaseCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B60000000000000000000000 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;

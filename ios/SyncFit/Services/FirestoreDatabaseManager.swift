@@ -589,6 +589,59 @@ final class FirestoreDatabaseManager: ObservableObject {
         }
     }
 
+    /// Reads payment readiness from the server so a cached marketplace profile can
+    /// never authorize a Checkout attempt.
+    func fetchCoachStripeChargesEnabled(coachFirestoreID: String) async throws -> Bool {
+        guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
+        let document = try await db.collection("coaches")
+            .document(coachFirestoreID)
+            .getDocument(source: .server)
+        return document.data()?["stripeChargesEnabled"] as? Bool ?? false
+    }
+
+    func observeCoachStripeChargesEnabled(
+        coachFirestoreID: String,
+        onChange: @escaping (Bool) -> Void,
+        onError: @escaping (Error) -> Void
+    ) -> ListenerRegistration? {
+        guard let db else { return nil }
+        return db.collection("coaches").document(coachFirestoreID)
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    onError(error)
+                    return
+                }
+                onChange(snapshot?.data()?["stripeChargesEnabled"] as? Bool ?? false)
+            }
+    }
+
+    /// Querying only the client participant avoids a compound index; coach and
+    /// status are deliberately filtered client-side.
+    func observeActiveCoachSubscription(
+        clientUserID: String,
+        coachFirestoreID: String,
+        onActive: @escaping () -> Void,
+        onError: @escaping (Error) -> Void
+    ) -> ListenerRegistration? {
+        guard let db else { return nil }
+        return db.collection("coachSubscriptions")
+            .whereField("clientUid", isEqualTo: clientUserID)
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    onError(error)
+                    return
+                }
+                let hasActiveMatch = snapshot?.documents.contains { document in
+                    let data = document.data()
+                    return data["coachUid"] as? String == coachFirestoreID
+                        && data["status"] as? String == "active"
+                } ?? false
+                if hasActiveMatch {
+                    onActive()
+                }
+            }
+    }
+
     func saveCoachClientConnection(_ connection: CoachClientConnection) async throws {
         guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
         let coachKey = connection.coachFirestoreID
@@ -1193,6 +1246,7 @@ final class FirestoreDatabaseManager: ObservableObject {
         let specialties = data["specialties"] as? [String] ?? [specialty]
         let isLive = data["isLive"] as? Bool ?? true
         let isListed = data["isListed"] as? Bool ?? true
+        let stripeChargesEnabled = data["stripeChargesEnabled"] as? Bool ?? false
         let availability = CoachAvailability(rawValue: availabilityRaw) ?? .online
 
         let profile = CoachProfile(
@@ -1213,7 +1267,8 @@ final class FirestoreDatabaseManager: ObservableObject {
             photoURL: photoURL,
             isLive: isLive,
             isListed: isListed,
-            coachUserID: coachUserID
+            coachUserID: coachUserID,
+            stripeChargesEnabled: stripeChargesEnabled
         )
         return profile.sanitizedForDisplay()
     }

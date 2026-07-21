@@ -14,7 +14,6 @@ struct CoachProfileScreen: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showingAllReviews = false
-    @State private var showingConnectSheet = false
     @State private var showingManageSharing = false
     @State private var didOpenManageSharing = false
     @State private var activeChat: CoachChatRoute?
@@ -26,6 +25,16 @@ struct CoachProfileScreen: View {
 
     private var isConnected: Bool {
         activeConnection != nil
+    }
+
+    private var liveStripeChargesEnabled: Bool {
+        coachService.liveStripeChargesEnabled[coach.coachFirestoreID] == true
+    }
+
+    private var checkoutState: CoachHireCheckoutState {
+        coachService.hireCheckoutCoachUID == coach.coachFirestoreID
+            ? coachService.hireCheckoutState
+            : .idle
     }
 
     var body: some View {
@@ -81,14 +90,15 @@ struct CoachProfileScreen: View {
         .sheet(isPresented: $showingAllReviews) {
             CoachReviewsSheet(coach: coach)
         }
-        .sheet(isPresented: $showingConnectSheet) {
-            CoachDataSharingConsentView(coach: coach) {}
-        }
         .sheet(isPresented: $showingManageSharing) {
             CoachSharingManageView(coach: coach)
         }
         .onAppear {
+            coachService.observeStripeAvailability(for: coach)
             checkConnectionStatus()
+        }
+        .onDisappear {
+            coachService.stopObservingStripeAvailability(coachUID: coach.coachFirestoreID)
         }
         .onChange(of: coachService.clientCoachConnections) { _, _ in
             checkConnectionStatus()
@@ -279,13 +289,53 @@ struct CoachProfileScreen: View {
                 }
                 .buttonStyle(CoachGhostButtonStyle())
 
-                Button("Hire this coach →") {
-                    showingConnectSheet = true
+                if liveStripeChargesEnabled {
+                    Button(hireButtonTitle) {
+                        Task { await coachService.beginCoachCheckout(for: coach) }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(isCheckoutInProgress || checkoutState == .confirmed)
+                } else {
+                    Text("This coach is still completing setup.")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CoachUIColor.muted)
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
-                .buttonStyle(PrimaryButtonStyle())
+
+                if checkoutState == .canceled {
+                    Text("Checkout was canceled")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CoachUIColor.muted)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else if case .failed(let message) = checkoutState,
+                          message != "This coach is still completing setup." {
+                    Text(message)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CoachUIColor.errorRed)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
             }
         }
         .padding(.top, 8)
+    }
+
+    private var hireButtonTitle: String {
+        switch checkoutState {
+        case .creatingCheckout: return "Starting checkout..."
+        case .authenticating: return "Checkout open"
+        case .confirming: return "Confirming..."
+        case .confirmed: return "Payment confirmed"
+        default: return "Hire this coach →"
+        }
+    }
+
+    private var isCheckoutInProgress: Bool {
+        switch checkoutState {
+        case .creatingCheckout, .authenticating, .confirming:
+            return true
+        default:
+            return false
+        }
     }
 
     private var connectedStatusPill: some View {

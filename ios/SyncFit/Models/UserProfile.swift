@@ -595,6 +595,7 @@ struct CoachProfile: Identifiable, Codable, Hashable {
     var isLive: Bool
     var isListed: Bool
     var coachUserID: String?
+    var stripeChargesEnabled: Bool
 
     init(
         id: UUID = UUID(),
@@ -615,7 +616,8 @@ struct CoachProfile: Identifiable, Codable, Hashable {
         transformationPhotoFileNames: [String] = [],
         isLive: Bool = true,
         isListed: Bool = true,
-        coachUserID: String? = nil
+        coachUserID: String? = nil,
+        stripeChargesEnabled: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -636,6 +638,7 @@ struct CoachProfile: Identifiable, Codable, Hashable {
         self.isLive = isLive
         self.isListed = isListed
         self.coachUserID = coachUserID
+        self.stripeChargesEnabled = stripeChargesEnabled
     }
 
     var coachFirestoreID: String {

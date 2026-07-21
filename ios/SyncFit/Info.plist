@@ -8,6 +8,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.286650245340-5mt20t4vfi82gjl6kpmpbgkrmjhon07m</string>
+				<string>syncfit</string>
 			</array>
 		</dict>
 	</array>
