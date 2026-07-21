@@ -192,17 +192,39 @@ service cloud.firestore {
     }
 
     // Marketplace coach profiles — signed-in read; coach writes own doc only.
+    // Stripe Connect fields are Admin SDK (Cloud Functions) only — never client-writable.
     match /coaches/{coachId} {
+      function coachStripeFieldsAbsentOnCreate() {
+        return !request.resource.data.keys().hasAny([
+          'stripeConnectedAccountId',
+          'stripeChargesEnabled',
+          'stripePayoutsEnabled',
+          'stripeUpdatedAt'
+        ]);
+      }
+
+      function coachStripeFieldsUnchangedOnUpdate() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny([
+            'stripeConnectedAccountId',
+            'stripeChargesEnabled',
+            'stripePayoutsEnabled',
+            'stripeUpdatedAt'
+          ]);
+      }
+
       allow read: if isSignedIn();
 
       allow create: if isSignedIn()
         && coachId == request.auth.uid
-        && request.resource.data.coachId == request.auth.uid;
+        && request.resource.data.coachId == request.auth.uid
+        && coachStripeFieldsAbsentOnCreate();
 
       allow update: if isSignedIn()
         && coachId == request.auth.uid
         && resource.data.coachId == request.auth.uid
-        && request.resource.data.coachId == request.auth.uid;
+        && request.resource.data.coachId == request.auth.uid
+        && coachStripeFieldsUnchangedOnUpdate();
 
       allow delete: if isSignedIn()
         && coachId == request.auth.uid
@@ -211,6 +233,11 @@ service cloud.firestore {
       match /routine_templates/{templateId} {
         allow read, write: if isSignedIn() && request.auth.uid == coachId;
       }
+    }
+
+    // Stripe webhook idempotency ledger — Admin SDK only.
+    match /stripeWebhookEvents/{eventId} {
+      allow read, write: if false;
     }
 
     // Coach ↔ client connections. Only participants may create/update their own edge.

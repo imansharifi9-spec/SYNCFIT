@@ -1,0 +1,29 @@
+{
+  "name": "syncfit-functions",
+  "description": "SyncFit Cloud Functions — subscription gating and future AI backends",
+  "version": "1.0.0",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "mocha test/**/*.test.js --exit --timeout 20000",
+    "serve": "firebase emulators:start --only functions,firestore",
+    "deploy": "firebase deploy --only functions"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^6.6.0",
+    "stripe": "^22.3.2"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "chai": "^4.5.0",
+    "firebase-functions-test": "^3.4.1",
+    "mocha": "^11.7.5"
+  },
+  "private": true
+}
