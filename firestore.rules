@@ -167,9 +167,68 @@ service cloud.firestore {
         allow get, list, create, update, delete: if isOwner(userId);
       }
 
+      // SyncFit+ AI Companion — strictly scoped to the authenticated user.
+      // Cloud Functions writes through Admin SDK; client access is owner-only
+      // for conversation history rendering and local user message drafts.
+      match /aiCompanionConversations/{conversationId} {
+        function isValidAICompanionConversation() {
+          return request.resource.data.keys().hasOnly([
+              'id',
+              'userId',
+              'title',
+              'lastMessage',
+              'lastMessageRole',
+              'lastMessageAt',
+              'createdAt',
+              'updatedAt'
+            ])
+            && request.resource.data.keys().hasAll(['userId'])
+            && request.resource.data.userId == userId
+            && (!('id' in request.resource.data) || request.resource.data.id == conversationId)
+            && (!('title' in request.resource.data) || request.resource.data.title is string)
+            && (!('lastMessage' in request.resource.data) || request.resource.data.lastMessage is string)
+            && (!('lastMessageRole' in request.resource.data)
+              || request.resource.data.lastMessageRole in ['user', 'assistant'])
+            && (!('lastMessageAt' in request.resource.data)
+              || request.resource.data.lastMessageAt is timestamp)
+            && (!('createdAt' in request.resource.data)
+              || request.resource.data.createdAt is timestamp)
+            && (!('updatedAt' in request.resource.data)
+              || request.resource.data.updatedAt is timestamp);
+        }
+
+        allow get, list: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidAICompanionConversation();
+        allow delete: if false;
+
+        match /messages/{messageId} {
+          function isValidAICompanionMessage() {
+            return request.resource.data.keys().hasOnly([
+                'role',
+                'text',
+                'userId',
+                'createdAt'
+              ])
+              && request.resource.data.keys().hasAll(['role', 'text', 'userId'])
+              && request.resource.data.userId == userId
+              && request.resource.data.role in ['user', 'assistant']
+              && request.resource.data.text is string
+              && request.resource.data.text.size() > 0
+              && request.resource.data.text.size() <= 8000
+              && (!('createdAt' in request.resource.data)
+                || request.resource.data.createdAt is timestamp);
+          }
+
+          allow get, list: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidAICompanionMessage();
+          allow update, delete: if false;
+        }
+      }
+
       // Any other user subcollections stay owner-only.
       match /{subcollection}/{docId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId)
+          && subcollection != 'aiCompanionConversations';
       }
     }
 
@@ -322,6 +381,12 @@ service cloud.firestore {
 
         allow delete: if false;
       }
+    }
+
+    // Shared ExerciseDB GIF resolution cache — Cloud Functions (Admin) only.
+    match /exerciseMedia/{mediaId} {
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     // Legacy coach messages — both parties required; no anonymous forge.

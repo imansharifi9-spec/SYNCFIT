@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Progress photos: users/{uid}/progress_photos/{fileName}
+    // Owner-only. Coach access uses Firestore metadata + download URLs.
+    match /users/{userId}/progress_photos/{fileName} {
+      allow read: if isOwner(userId);
+      allow delete: if isOwner(userId);
+
+      // Create / overwrite — validate the incoming object.
+      allow create, update: if isOwner(userId)
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Coach profile picture: coaches/{coachAuthUid}/profile.jpg
+    // Owner write; any signed-in user may read (marketplace / public profile).
+    match /coaches/{coachId}/profile.jpg {
+      allow read: if isSignedIn();
+      allow delete: if isOwner(coachId);
+      allow create, update: if isOwner(coachId)
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Client profile avatar: users/{userAuthUid}/profile.jpg
+    // Owner write; signed-in read (coach client list / shared views via download URL).
+    match /users/{userId}/profile.jpg {
+      allow read: if isSignedIn();
+      allow delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
