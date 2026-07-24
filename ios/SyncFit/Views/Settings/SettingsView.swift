@@ -1,9 +1,11 @@
 import SwiftUI
 import FirebaseAuth
+import FirebaseFunctions
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var authManager: AuthenticationManager
+    @EnvironmentObject private var dataStore: FitnessDataStore
     @EnvironmentObject private var coachService: CoachService
     @EnvironmentObject private var chatService: CoachChatService
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
@@ -12,6 +14,11 @@ struct SettingsView: View {
     @State private var showingCoachLogin = false
     @State private var isUpdatingCoachPermissions = false
     @State private var showingDisconnectConfirm = false
+    @State private var showingDeleteAccountFirstConfirm = false
+    @State private var showingDeleteAccountFinalConfirm = false
+    @State private var showingDeleteAccountError = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountErrorMessage: String?
     @State private var selectedCoachProfile: CoachProfile?
     @State private var activeChat: CoachChatRoute?
 
@@ -223,8 +230,21 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                         Button("Export Data") {}
                             .buttonStyle(SecondaryButtonStyle())
-                        Button("Delete Account", role: .destructive) {}
-                            .buttonStyle(.bordered)
+                        Button(role: .destructive) {
+                            showingDeleteAccountFirstConfirm = true
+                        } label: {
+                            HStack {
+                                Text("Delete Account")
+                                if isDeletingAccount {
+                                    Spacer()
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isDeletingAccount)
+                        .accessibilityIdentifier("deleteAccountButton")
                     }
                 }
 
@@ -303,6 +323,38 @@ struct SettingsView: View {
         } message: {
             Text("They will lose access to your data immediately.")
         }
+        .confirmationDialog(
+            "Delete your account?",
+            isPresented: $showingDeleteAccountFirstConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Continue", role: .destructive) {
+                showingDeleteAccountFinalConfirm = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure? This cannot be undone. Your account and associated cloud data will be permanently deleted.")
+        }
+        .confirmationDialog(
+            "Delete permanently?",
+            isPresented: $showingDeleteAccountFinalConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete permanently", role: .destructive) {
+                Task { await deleteAccount() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This is your final confirmation. Account deletion cannot be reversed.")
+        }
+        .alert(
+            "Couldn't delete account",
+            isPresented: $showingDeleteAccountError
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteAccountErrorMessage ?? DeleteAccountErrorMapper.genericFailureMessage)
+        }
         .sheet(isPresented: $showingEditProfile) {
             EditProfileSheet(profile: appState.profile)
         }
@@ -311,6 +363,43 @@ struct SettingsView: View {
         }
         .task {
             await coachService.refreshClientCoachConnection()
+        }
+    }
+
+    @MainActor
+    private func deleteAccount() async {
+        guard !isDeletingAccount else { return }
+        guard FirebaseConfiguration.isConfigured else {
+            deleteAccountErrorMessage = "Firebase is not configured. Add GoogleService-Info.plist to the SyncFit target."
+            showingDeleteAccountError = true
+            return
+        }
+        guard Auth.auth().currentUser != nil else {
+            deleteAccountErrorMessage = "Sign in again, then try deleting your account."
+            showingDeleteAccountError = true
+            return
+        }
+
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+
+        do {
+            _ = try await Functions.functions()
+                .httpsCallable("deleteUserAccount")
+                .call([:] as [String: Any])
+
+            // Wipe local cache for the deleted UID before sign-out so nothing is left orphaned.
+            dataStore.clearAllLocalUserData()
+            AuthenticationManager.clearLocalDataOwnerUserID()
+            AuthenticationManager.clearLastAuthenticatedUserID()
+            appState.resetProfileForUserSwitch()
+            coachService.resetForUserSwitch()
+            chatService.teardown()
+            subscriptionManager.resetForLogout()
+            authManager.signOut()
+        } catch {
+            deleteAccountErrorMessage = DeleteAccountErrorMapper.displayMessage(for: error)
+            showingDeleteAccountError = true
         }
     }
 

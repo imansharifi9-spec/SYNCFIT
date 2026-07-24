@@ -29,6 +29,10 @@ const {
   createCheckoutSessionForUid,
 } = require("./createCheckoutSession");
 const {
+  deleteUserAccountForUid,
+  assertSelfOnlyTarget,
+} = require("./deleteUserAccount");
+const {
   resolveExerciseMediaForName,
   cleanupMismatchedExerciseMediaCache,
   MEDIA_LOGIC_VERSION,
@@ -41,6 +45,11 @@ if (!getApps().length) {
       process.env.GCLOUD_PROJECT ||
       process.env.GOOGLE_CLOUD_PROJECT ||
       "syncfit-8441f",
+    // Required for Admin Storage wipes (deleteUserAccount). Matches iOS
+    // GoogleService-Info.plist STORAGE_BUCKET.
+    storageBucket:
+      process.env.FIREBASE_STORAGE_BUCKET ||
+      "syncfit-8441f.firebasestorage.app",
   });
 }
 
@@ -316,6 +325,34 @@ const stripeWebhook = onRequest(
   }
 );
 
+/**
+ * Delete the signed-in user's account (Firestore + Storage + Auth).
+ * Body: {} — optional targetUid must match auth.uid or is permission-denied.
+ * Coach accounts with non-terminal client subscriptions are blocked.
+ */
+const deleteUserAccount = onCall(
+  {
+    secrets: [stripeSecretKey],
+    timeoutSeconds: 120,
+    memory: "512MiB",
+  },
+  async (request) => {
+    if (!request.auth || !request.auth.uid) {
+      throw new HttpsError(
+        "unauthenticated",
+        "Sign in required to delete your account."
+      );
+    }
+
+    const uid = request.auth.uid;
+    assertSelfOnlyTarget(uid, request.data || {});
+
+    return deleteUserAccountForUid(uid, {
+      getStripe: () => createStripeWebhookClient(stripeSecretKey.value()),
+    });
+  }
+);
+
 module.exports = {
   checkSubscriptionEntitlement,
   checkSubscriptionEntitlementForUid,
@@ -332,6 +369,8 @@ module.exports = {
   createCoachStripeAccountForUid,
   createCheckoutSession,
   createCheckoutSessionForUid,
+  deleteUserAccount,
+  deleteUserAccountForUid,
   stripeWebhook,
   resolveExerciseMedia,
   resolveExerciseMediaForName,

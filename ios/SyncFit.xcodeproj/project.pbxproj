@@ -91,6 +91,8 @@
 		A10000000000000000000083 /* UserPhotoStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000083 /* UserPhotoStorage.swift */; };
 		A10000000000000000000084 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000084 /* SubscriptionManager.swift */; };
 		T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */; };
+		E10000000000000000000008 /* DeleteAccountErrorMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000008 /* DeleteAccountErrorMapper.swift */; };
+		T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -189,6 +191,8 @@
 		A20000000000000000000080 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
 		T10000000000000000000002 /* SyncFitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SyncFitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachCheckoutCallbackValidatorTests.swift; sourceTree = "<group>"; };
+		E20000000000000000000008 /* DeleteAccountErrorMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountErrorMapper.swift; sourceTree = "<group>"; };
+		T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountErrorMapperTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -289,6 +293,7 @@
 				A2000000000000000000007E /* CoachPlaceholderContent.swift */,
 				A20000000000000000000079 /* CoachAuthCrypto.swift */,
 				A20000000000000000000084 /* SubscriptionManager.swift */,
+				E20000000000000000000008 /* DeleteAccountErrorMapper.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -430,6 +435,7 @@
 			isa = PBXGroup;
 			children = (
 				T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */,
+				T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */,
 			);
 			path = SyncFitTests;
 			sourceTree = "<group>";
@@ -608,6 +614,7 @@
 				A10000000000000000000040 /* AppleHealthSettingsSection.swift in Sources */,
 				A10000000000000000000041 /* AuthenticationManager.swift in Sources */,
 				A10000000000000000000084 /* SubscriptionManager.swift in Sources */,
+				E10000000000000000000008 /* DeleteAccountErrorMapper.swift in Sources */,
 				A10000000000000000000042 /* FirestoreDatabaseManager.swift in Sources */,
 				A10000000000000000000047 /* FirebaseConfiguration.swift in Sources */,
 				A10000000000000000000050 /* SignInWithAppleButton.swift in Sources */,
@@ -649,6 +656,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */,
+				T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
