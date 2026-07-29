@@ -91,6 +91,7 @@
 		A10000000000000000000083 /* UserPhotoStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000083 /* UserPhotoStorage.swift */; };
 		A10000000000000000000084 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000084 /* SubscriptionManager.swift */; };
 		T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */; };
+		T1000000000000000000000A /* CoachCheckoutConfirmationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000000000000000000000B /* CoachCheckoutConfirmationTests.swift */; };
 		E10000000000000000000008 /* DeleteAccountErrorMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000008 /* DeleteAccountErrorMapper.swift */; };
 		T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */; };
 		T11000000000000000000001 /* CoachChatListenerLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */; };
@@ -192,6 +193,7 @@
 		A20000000000000000000080 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
 		T10000000000000000000002 /* SyncFitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SyncFitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachCheckoutCallbackValidatorTests.swift; sourceTree = "<group>"; };
+		T1000000000000000000000B /* CoachCheckoutConfirmationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachCheckoutConfirmationTests.swift; sourceTree = "<group>"; };
 		E20000000000000000000008 /* DeleteAccountErrorMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountErrorMapper.swift; sourceTree = "<group>"; };
 		T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountErrorMapperTests.swift; sourceTree = "<group>"; };
 		T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachChatListenerLifecycleTests.swift; sourceTree = "<group>"; };
@@ -437,6 +439,7 @@
 			isa = PBXGroup;
 			children = (
 				T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */,
+				T1000000000000000000000B /* CoachCheckoutConfirmationTests.swift */,
 				T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */,
 				T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */,
 			);
@@ -659,6 +662,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */,
+				T1000000000000000000000A /* CoachCheckoutConfirmationTests.swift in Sources */,
 				T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */,
 				T11000000000000000000001 /* CoachChatListenerLifecycleTests.swift in Sources */,
 			);

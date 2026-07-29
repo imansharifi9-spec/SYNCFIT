@@ -289,41 +289,84 @@ struct CoachProfileScreen: View {
                 }
                 .buttonStyle(CoachGhostButtonStyle())
 
-                if liveStripeChargesEnabled {
-                    Button(hireButtonTitle) {
-                        Task { await coachService.beginCoachCheckout(for: coach) }
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(isCheckoutInProgress || checkoutState == .confirmed)
-                } else {
-                    Text("This coach is still completing setup.")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(CoachUIColor.muted)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-
-                if checkoutState == .canceled {
-                    Text("Checkout was canceled")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(CoachUIColor.muted)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                } else if case .failed(let message) = checkoutState,
-                          message != "This coach is still completing setup." {
-                    Text(message)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(CoachUIColor.errorRed)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                switch checkoutState {
+                case .confirming:
+                    checkoutConfirmingPanel
+                case .confirmationTimedOut:
+                    checkoutTimeoutFallbackPanel
+                default:
+                    hireCheckoutControls
                 }
             }
         }
         .padding(.top, 8)
     }
 
+    private var hireCheckoutControls: some View {
+        VStack(spacing: 10) {
+            if liveStripeChargesEnabled {
+                Button(hireButtonTitle) {
+                    Task { await coachService.beginCoachCheckout(for: coach) }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(isCheckoutInProgress || checkoutState == .confirmed)
+            } else {
+                Text("This coach is still completing setup.")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(CoachUIColor.muted)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+
+            if checkoutState == .canceled {
+                Text(CoachCheckoutConfirmationCopy.canceledMessage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(CoachUIColor.muted)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else if case .failed(let message) = checkoutState,
+                      message != "This coach is still completing setup." {
+                Text(message)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(CoachUIColor.errorRed)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+        }
+    }
+
+    private var checkoutConfirmingPanel: some View {
+        VStack(spacing: 10) {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .tint(CoachUIColor.accent)
+            Text(CoachCheckoutConfirmationCopy.confirmingTitle)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var checkoutTimeoutFallbackPanel: some View {
+        VStack(spacing: 10) {
+            Text(CoachCheckoutConfirmationCopy.timeoutMessage)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(CoachUIColor.muted)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            Button(CoachCheckoutConfirmationCopy.refreshTitle) {
+                Task { await coachService.refreshHireCheckoutConfirmation() }
+            }
+            .buttonStyle(CoachTertiaryButtonStyle())
+        }
+        .padding(.vertical, 4)
+    }
+
     private var hireButtonTitle: String {
         switch checkoutState {
         case .creatingCheckout: return "Starting checkout..."
         case .authenticating: return "Checkout open"
-        case .confirming: return "Confirming..."
+        case .confirming: return CoachCheckoutConfirmationCopy.confirmingTitle
         case .confirmed: return "Payment confirmed"
         default: return "Hire this coach →"
         }

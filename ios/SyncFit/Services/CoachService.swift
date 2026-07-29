@@ -27,9 +27,98 @@ enum CoachHireCheckoutState: Equatable {
     case creatingCheckout
     case authenticating
     case confirming
+    case confirmationTimedOut
     case confirmed
     case canceled
     case failed(String)
+}
+
+struct CoachStripeStatus: Equatable {
+    var chargesEnabled: Bool
+    var hasConnectedAccount: Bool
+
+    static let unknown = CoachStripeStatus(chargesEnabled: false, hasConnectedAccount: false)
+}
+
+enum CoachStripeOnboardingState: Equatable, CustomStringConvertible {
+    case idle
+    case creatingLink
+    case authenticating
+    case waitingForWebhook
+    case complete
+    case canceled
+    case failed(String)
+
+    var description: String {
+        switch self {
+        case .idle: return "idle"
+        case .creatingLink: return "creatingLink"
+        case .authenticating: return "authenticating"
+        case .waitingForWebhook: return "waitingForWebhook"
+        case .complete: return "complete"
+        case .canceled: return "canceled"
+        case .failed(let message): return "failed(\(message))"
+        }
+    }
+}
+
+enum CoachStripeOnboardingCallbackResult: Equatable {
+    case returned
+    case refresh
+    case invalid
+}
+
+/// Validates `syncfit://stripe-onboarding-return` (+ optional `refresh=1`) from Account Links.
+enum CoachStripeOnboardingCallbackValidator {
+    static func result(for url: URL) -> CoachStripeOnboardingCallbackResult {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme == "syncfit",
+              components.user == nil,
+              components.password == nil,
+              components.port == nil,
+              components.fragment == nil,
+              components.path.isEmpty || components.path == "/",
+              components.host == "stripe-onboarding-return" else {
+            return .invalid
+        }
+
+        let items = components.queryItems ?? []
+        if items.isEmpty {
+            return .returned
+        }
+        guard items.count == 1,
+              items[0].name == "refresh",
+              items[0].value == "1" else {
+            return .invalid
+        }
+        return .refresh
+    }
+}
+
+enum CoachCheckoutConfirmationCopy {
+    static let confirmingTitle = "Confirming your subscription..."
+    static let timeoutMessage =
+        "Still confirming — this can take a moment. Check back shortly."
+    static let refreshTitle = "Refresh"
+    static let canceledMessage = "Checkout was canceled"
+}
+
+enum CoachCheckoutConfirmationTiming {
+    static let standardTimeoutNanoseconds: UInt64 = 15_000_000_000
+
+    #if DEBUG
+    /// DEBUG only: when true, confirmation timeout fires immediately so the
+    /// fallback UI can be verified without waiting 15 seconds.
+    static var forceImmediateTimeout = false
+    #endif
+
+    static var timeoutNanoseconds: UInt64 {
+        #if DEBUG
+        forceImmediateTimeout ? 0 : standardTimeoutNanoseconds
+        #else
+        standardTimeoutNanoseconds
+        #endif
+    }
 }
 
 enum CoachCheckoutCallbackResult: Equatable {
@@ -90,14 +179,20 @@ final class CoachService: NSObject, ObservableObject {
     @Published private(set) var hireCheckoutState: CoachHireCheckoutState = .idle
     @Published private(set) var hireCheckoutCoachUID: String?
     @Published private(set) var liveStripeChargesEnabled: [String: Bool] = [:]
+    @Published private(set) var ownStripeStatus: CoachStripeStatus = .unknown
+    @Published private(set) var stripeOnboardingState: CoachStripeOnboardingState = .idle
 
     private let context: ModelContext
     private var firestore: FirestoreDatabaseManager?
     private var messageListeners: [String: ListenerRegistration] = [:]
     private var stripeAvailabilityListeners: [String: ListenerRegistration] = [:]
-    private var coachSubscriptionListener: ListenerRegistration?
+    private var ownStripeStatusListener: ListenerRegistration?
+    private var coachConnectionListener: ListenerRegistration?
     private var checkoutConfirmationTimeoutTask: Task<Void, Never>?
     private var checkoutSession: ASWebAuthenticationSession?
+    private var stripeOnboardingSession: ASWebAuthenticationSession?
+    /// Bumped whenever a new onboarding attempt starts so stale ASWebAuth callbacks are ignored.
+    private var stripeOnboardingGeneration = 0
     private let locationManager = CLLocationManager()
 
     init(context: ModelContext) {
@@ -360,6 +455,7 @@ final class CoachService: NSObject, ObservableObject {
         isCoachModeActive = true
         persistLastCoachMode(true)
         persistSession()
+        startObservingOwnStripeStatus()
         Task { await syncPortalProfileToCloud() }
     }
 
@@ -368,6 +464,14 @@ final class CoachService: NSObject, ObservableObject {
         persistLastCoachMode(false)
         persistSession()
         stopAllMessageListeners()
+        stopObservingOwnStripeStatus()
+        stripeOnboardingSession?.cancel()
+        stripeOnboardingSession = nil
+        if case .complete = stripeOnboardingState {
+            // Keep complete until next observe refresh.
+        } else {
+            stripeOnboardingState = .idle
+        }
     }
 
     func setCoachModeActive(_ active: Bool) {
@@ -402,6 +506,11 @@ final class CoachService: NSObject, ObservableObject {
         stripeAvailabilityListeners.values.forEach { $0.remove() }
         stripeAvailabilityListeners.removeAll()
         liveStripeChargesEnabled.removeAll()
+        stopObservingOwnStripeStatus()
+        ownStripeStatus = .unknown
+        stripeOnboardingSession?.cancel()
+        stripeOnboardingSession = nil
+        stripeOnboardingState = .idle
         hireCheckoutCoachUID = nil
         hireCheckoutState = .idle
         persistSession()
@@ -446,19 +555,30 @@ final class CoachService: NSObject, ObservableObject {
 
     func uploadPortalProfileToCloud() async throws {
         guard let firestore else {
+            print("[CoachSave] FAILED — Firestore unavailable")
             throw FirestoreDatabaseError.firebaseUnavailable
         }
         guard isCoach else {
+            print("[CoachSave] FAILED — user is not a coach")
             throw FirestoreDatabaseError.notAuthenticated
         }
-        guard Auth.auth().currentUser?.uid != nil else {
+        guard let uid = Auth.auth().currentUser?.uid else {
+            print("[CoachSave] FAILED — not authenticated")
             throw FirestoreDatabaseError.notAuthenticated
         }
 
+        // Keep portal + marketplace payload on the Auth UID so rules + marketplace agree.
+        portalProfile.coachUserID = uid
+        if !portalProfile.isComplete {
+            print("[CoachSave] WARNING — profile incomplete; isLive will be false (marketplace hides it). nameEmpty=\(portalProfile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) specialtiesEmpty=\(portalProfile.specialties.isEmpty) aboutEmpty=\(portalProfile.about.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)")
+        }
+
         let profile = portalProfile.asMarketplaceProfile()
-        print("[CoachSave] Writing coaches/\(profile.coachFirestoreID)")
+        print("[CoachSave] PART1 local portal ready uid=\(uid) portalID=\(portalProfile.id.uuidString) complete=\(portalProfile.isComplete) listed=\(portalProfile.isListed) live=\(profile.isLive)")
         try await firestore.saveCoachProfile(profile)
-        print("[CoachSave] Firestore write completed")
+        // Refresh marketplace so this device immediately sees the live listing.
+        await refreshMarketplaceCoaches()
+        print("[CoachSave] PART2 cloud + marketplace refresh done")
     }
 
     func performProfileSave() async {
@@ -488,7 +608,7 @@ final class CoachService: NSObject, ObservableObject {
     }
 
     /// Pulls text fields from `coaches/{uid}` into the portal when local editor is empty
-    /// or after an account switch. Photos remain device-local until Storage is wired.
+    /// or after an account switch. Also restores photoURL when present in cloud.
     func hydratePortalProfileFromCloudIfNeeded() async {
         guard let firestore, isCoach else { return }
         guard let uid = Auth.auth().currentUser?.uid else { return }
@@ -523,6 +643,13 @@ final class CoachService: NSObject, ObservableObject {
                     portalProfile.availability = cloud.availability
                     portalProfile.location = cloud.location
                 }
+            }
+
+            if let photoURL = cloud.photoURL, !photoURL.isEmpty {
+                portalProfile.photoURL = photoURL
+            }
+            if let photoFileName = cloud.photoFileName, !photoFileName.isEmpty {
+                portalProfile.photoFileName = photoFileName
             }
 
             portalProfile.isLive = cloud.isLive
@@ -562,6 +689,206 @@ final class CoachService: NSObject, ObservableObject {
     func stopObservingStripeAvailability(coachUID: String) {
         stripeAvailabilityListeners.removeValue(forKey: coachUID)?.remove()
         liveStripeChargesEnabled.removeValue(forKey: coachUID)
+    }
+
+    /// Observe the signed-in coach's own `coaches/{uid}` Stripe fields while in coach mode.
+    func startObservingOwnStripeStatus() {
+        guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty, let firestore else {
+            Self.logStripeConnect(
+                "startObservingOwnStripeStatus skipped — uid=\(Auth.auth().currentUser?.uid ?? "nil") firestore=\(firestore != nil)"
+            )
+            return
+        }
+        // Always pull a server snapshot so a previously-attached listener (or a
+        // cached false) cannot leave the Payments UI stuck after webhook write.
+        Task { await self.refreshOwnStripeStatusFromServer() }
+
+        if ownStripeStatusListener != nil {
+            Self.logStripeConnect(
+                "startObservingOwnStripeStatus listener already attached uid=\(uid) current=\(ownStripeStatus)"
+            )
+            return
+        }
+        Self.logStripeConnect("Attaching coaches/\(uid) stripe snapshot listener")
+        ownStripeStatusListener = firestore.observeCoachStripeStatus(
+            coachFirestoreID: uid,
+            onChange: { [weak self] status in
+                Task { @MainActor in
+                    guard let self else { return }
+                    Self.logStripeConnect(
+                        "listener snapshot uid=\(uid) chargesEnabled=\(status.chargesEnabled) hasConnectedAccount=\(status.hasConnectedAccount) onboarding=\(self.stripeOnboardingState)"
+                    )
+                    self.applyOwnStripeStatus(status, uid: uid, source: "listener")
+                }
+            },
+            onError: { [weak self] error in
+                Task { @MainActor in
+                    Self.logStripeConnect("listener ERROR uid=\(uid): \(error.localizedDescription)")
+                    self?.ownStripeStatus = .unknown
+                }
+            }
+        )
+    }
+
+    /// Server-authoritative refresh of `coaches/{uid}` Stripe flags (bypasses local cache).
+    func refreshOwnStripeStatusFromServer() async {
+        guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty, let firestore else {
+            Self.logStripeConnect("refreshOwnStripeStatusFromServer skipped — no auth/firestore")
+            return
+        }
+        do {
+            let status = try await firestore.fetchCoachStripeStatus(coachFirestoreID: uid)
+            Self.logStripeConnect(
+                "server refresh uid=\(uid) chargesEnabled=\(status.chargesEnabled) hasConnectedAccount=\(status.hasConnectedAccount) onboarding=\(stripeOnboardingState)"
+            )
+            applyOwnStripeStatus(status, uid: uid, source: "server")
+        } catch {
+            Self.logStripeConnect("server refresh ERROR uid=\(uid): \(error.localizedDescription)")
+        }
+    }
+
+    private func applyOwnStripeStatus(_ status: CoachStripeStatus, uid: String, source: String) {
+        ownStripeStatus = status
+        liveStripeChargesEnabled[uid] = status.chargesEnabled
+        if status.chargesEnabled {
+            stripeOnboardingState = .complete
+        } else if stripeOnboardingState == .complete {
+            stripeOnboardingState = .idle
+        }
+        Self.logStripeConnect(
+            "apply[\(source)] chargesEnabled=\(status.chargesEnabled) hasConnectedAccount=\(status.hasConnectedAccount) → onboarding=\(stripeOnboardingState)"
+        )
+    }
+
+    func stopObservingOwnStripeStatus() {
+        ownStripeStatusListener?.remove()
+        ownStripeStatusListener = nil
+    }
+
+    /// Xcode console + /tmp probe file so Simulator verification can see the fixed build.
+    private static func logStripeConnect(_ message: String) {
+        let line = "[StripeConnect] \(message)"
+        print(line)
+        NSLog("%@", line)
+        let stamp = ISO8601DateFormatter().string(from: Date())
+        let payload = "\(stamp) \(line)\n"
+        let url = URL(fileURLWithPath: "/tmp/syncfit-stripeconnect-probe.log")
+        if let data = payload.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: url.path),
+               let handle = try? FileHandle(forWritingTo: url) {
+                defer { try? handle.close() }
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: data)
+            } else {
+                try? data.write(to: url, options: .atomic)
+            }
+        }
+    }
+
+    /// Create/reuse Stripe Express Account Link and open it in ASWebAuthenticationSession.
+    /// A new tap always mints a fresh Account Link except while the callable itself is in flight.
+    /// Stuck `.authenticating` / `.waitingForWebhook` sessions are superseded so the coach
+    /// never gets stuck reusing an expired browser session.
+    func beginStripeConnectOnboarding() async {
+        if stripeOnboardingState == .creatingLink {
+            Self.logStripeConnect("createCoachStripeAccount was already running — ignoring duplicate tap")
+            return
+        }
+        guard Auth.auth().currentUser != nil else {
+            stripeOnboardingState = .failed("Sign in as a coach to set up payments.")
+            return
+        }
+        // Re-check server before minting a link — webhook may have already flipped the flag.
+        await refreshOwnStripeStatusFromServer()
+        if ownStripeStatus.chargesEnabled {
+            Self.logStripeConnect("beginStripeConnectOnboarding short-circuit — chargesEnabled already true")
+            stripeOnboardingState = .complete
+            return
+        }
+
+        // Supersede any open/waiting session so the next callable returns a brand-new Account Link.
+        stripeOnboardingGeneration += 1
+        let generation = stripeOnboardingGeneration
+        if stripeOnboardingSession != nil
+            || stripeOnboardingState == .authenticating
+            || stripeOnboardingState == .waitingForWebhook
+        {
+            let previous = stripeOnboardingSession
+            stripeOnboardingSession = nil
+            previous?.cancel()
+            Self.logStripeConnect("Superseded prior onboarding session (generation \(generation))")
+        }
+
+        startObservingOwnStripeStatus()
+        stripeOnboardingState = .creatingLink
+        Self.logStripeConnect("Minting Account Link (generation \(generation))")
+
+        do {
+            let result = try await Functions.functions()
+                .httpsCallable("createCoachStripeAccount")
+                .call([:] as [String: Any])
+            guard generation == stripeOnboardingGeneration else { return }
+            guard let response = result.data as? [String: Any],
+                  let rawURL = response["url"] as? String,
+                  let onboardingURL = URL(string: rawURL) else {
+                stripeOnboardingState = .failed("Couldn't open Stripe setup. Please try again.")
+                return
+            }
+            // Account id is now on the coach doc (or reused) — observer will pick up hasConnectedAccount.
+            openStripeOnboarding(onboardingURL, generation: generation)
+        } catch {
+            guard generation == stripeOnboardingGeneration else { return }
+            stripeOnboardingState = .failed(error.localizedDescription)
+        }
+    }
+
+    private func openStripeOnboarding(_ url: URL, generation: Int) {
+        stripeOnboardingSession?.cancel()
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callbackURLScheme: "syncfit"
+        ) { [weak self] callbackURL, error in
+            Task { @MainActor in
+                guard let self else { return }
+                // Ignore cancel/complete from a session the coach already replaced with a new tap.
+                guard generation == self.stripeOnboardingGeneration else { return }
+                self.stripeOnboardingSession = nil
+
+                if let authenticationError = error as? ASWebAuthenticationSessionError,
+                   authenticationError.code == .canceledLogin {
+                    self.stripeOnboardingState = .canceled
+                    return
+                }
+                if let error {
+                    self.stripeOnboardingState = .failed(error.localizedDescription)
+                    return
+                }
+                guard let callbackURL else {
+                    self.stripeOnboardingState = .failed("Stripe setup returned no callback.")
+                    return
+                }
+                switch CoachStripeOnboardingCallbackValidator.result(for: callbackURL) {
+                case .invalid:
+                    self.stripeOnboardingState = .failed("Stripe setup returned an invalid callback.")
+                case .returned, .refresh:
+                    // Never assume success — wait for stripeChargesEnabled via Firestore.
+                    if self.ownStripeStatus.chargesEnabled {
+                        self.stripeOnboardingState = .complete
+                    } else {
+                        self.stripeOnboardingState = .waitingForWebhook
+                        self.startObservingOwnStripeStatus()
+                    }
+                }
+            }
+        }
+        session.presentationContextProvider = self
+        session.prefersEphemeralWebBrowserSession = false
+        stripeOnboardingSession = session
+        stripeOnboardingState = .authenticating
+        if !session.start() {
+            stripeOnboardingSession = nil
+            stripeOnboardingState = .failed("Couldn't open Stripe setup. Please try again.")
+        }
     }
 
     func beginCoachCheckout(for coach: CoachProfile) async {
@@ -619,12 +946,55 @@ final class CoachService: NSObject, ObservableObject {
     func resetHireCheckoutMessage(for coachUID: String) {
         guard hireCheckoutCoachUID == coachUID else { return }
         switch hireCheckoutState {
-        case .canceled, .failed, .confirmed:
+        case .canceled, .failed, .confirmed, .confirmationTimedOut:
             hireCheckoutState = .idle
         default:
             break
         }
     }
+
+    /// One-shot re-check after the confirmation timeout fallback. Still trusts
+    /// only an active `coach_clients` document — never invents a local hire.
+    func refreshHireCheckoutConfirmation() async {
+        guard let coachUID = hireCheckoutCoachUID,
+              hireCheckoutState == .confirmationTimedOut else { return }
+        guard let clientUID = Auth.auth().currentUser?.uid, let firestore else {
+            hireCheckoutState = .failed("Sign in to confirm this checkout.")
+            return
+        }
+
+        do {
+            if let connection = try await firestore.fetchClientCoachConnection(
+                clientUserID: clientUID,
+                coachFirestoreID: coachUID
+            ), connection.isActive {
+                await completeConfirmedCheckout(coachUID: coachUID)
+            }
+        } catch {
+            hireCheckoutState = .failed(error.localizedDescription)
+        }
+    }
+
+    #if DEBUG
+    /// Simulator/manual helper: enter confirmation and force the timeout fallback
+    /// without waiting the full 15 seconds.
+    func debugSimulateConfirmationTimeoutFallback(coachUID: String) {
+        CoachCheckoutConfirmationTiming.forceImmediateTimeout = true
+        cancelCheckoutConfirmation()
+        hireCheckoutCoachUID = coachUID
+        hireCheckoutState = .confirming
+        scheduleConfirmationTimeout(coachUID: coachUID)
+    }
+
+    /// Simulator/manual helper: exercise the confirming → hired transition path
+    /// using the same Firestore-backed completion used by the live listener.
+    func debugSimulateConfirmationSuccess(coachUID: String) async {
+        cancelCheckoutConfirmation()
+        hireCheckoutCoachUID = coachUID
+        hireCheckoutState = .confirming
+        await completeConfirmedCheckout(coachUID: coachUID)
+    }
+    #endif
 
     private func openCheckout(_ url: URL, coachUID: String) {
         let session = ASWebAuthenticationSession(
@@ -678,15 +1048,13 @@ final class CoachService: NSObject, ObservableObject {
 
         cancelCheckoutConfirmation()
         hireCheckoutState = .confirming
-        coachSubscriptionListener = firestore.observeActiveCoachSubscription(
+        coachConnectionListener = firestore.observeActiveCoachClientConnection(
             clientUserID: clientUID,
             coachFirestoreID: coachUID,
             onActive: { [weak self] in
                 Task { @MainActor in
                     guard let self, self.hireCheckoutCoachUID == coachUID else { return }
-                    self.cancelCheckoutConfirmation()
-                    await self.refreshClientCoachConnection()
-                    self.hireCheckoutState = .confirmed
+                    await self.completeConfirmedCheckout(coachUID: coachUID)
                 }
             },
             onError: { [weak self] error in
@@ -697,29 +1065,45 @@ final class CoachService: NSObject, ObservableObject {
                 }
             }
         )
-        guard coachSubscriptionListener != nil else {
+        guard coachConnectionListener != nil else {
             hireCheckoutState = .failed("Checkout confirmation is unavailable.")
             return
         }
 
+        scheduleConfirmationTimeout(coachUID: coachUID)
+    }
+
+    private func scheduleConfirmationTimeout(coachUID: String) {
+        checkoutConfirmationTimeoutTask?.cancel()
+        let timeoutNanoseconds = CoachCheckoutConfirmationTiming.timeoutNanoseconds
         checkoutConfirmationTimeoutTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 120_000_000_000)
+            if timeoutNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+            } else {
+                await Task.yield()
+            }
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 guard let self,
                       self.hireCheckoutCoachUID == coachUID,
                       self.hireCheckoutState == .confirming else { return }
                 self.cancelCheckoutConfirmation()
-                self.hireCheckoutState = .failed(
-                    "Checkout confirmation is taking longer than expected. Please try again."
-                )
+                self.hireCheckoutState = .confirmationTimedOut
             }
         }
     }
 
+    private func completeConfirmedCheckout(coachUID: String) async {
+        cancelCheckoutConfirmation()
+        await refreshClientCoachConnection()
+        guard hireCheckoutCoachUID == coachUID else { return }
+        // Hired UI still requires an active coach_clients doc via refresh above.
+        hireCheckoutState = .confirmed
+    }
+
     private func cancelCheckoutConfirmation() {
-        coachSubscriptionListener?.remove()
-        coachSubscriptionListener = nil
+        coachConnectionListener?.remove()
+        coachConnectionListener = nil
         checkoutConfirmationTimeoutTask?.cancel()
         checkoutConfirmationTimeoutTask = nil
     }
@@ -1208,20 +1592,31 @@ final class CoachService: NSObject, ObservableObject {
     }
 
     private func refreshMarketplaceCoaches() async {
-        guard let firestore else { return }
+        guard let firestore else {
+            print("[CoachSave] Marketplace refresh skipped — Firestore unavailable")
+            return
+        }
         do {
             let remote = try await firestore.fetchCoachProfiles().map { $0.sanitizedForDisplay() }
-            if !remote.isEmpty {
-                let localIDs = Set(marketplaceCoaches.map(\.id))
-                let merged = marketplaceCoaches + remote.filter { !localIDs.contains($0.id) && $0.isLive && $0.isListed }
-                marketplaceCoaches = merged.map { $0.sanitizedForDisplay() }
+            // Prefer cloud listings. Keep any local-only seed that isn't already
+            // represented by a remote coachUserID (avoids hiding real coaches behind mocks).
+            let remoteUIDs = Set(remote.compactMap(\.coachUserID))
+            let localOnly = marketplaceCoaches.filter { coach in
+                guard let uid = coach.coachUserID, !uid.isEmpty else {
+                    // Untagged local mock — keep only if no remote coaches yet.
+                    return remote.isEmpty
+                }
+                return !remoteUIDs.contains(uid)
             }
+            marketplaceCoaches = (remote + localOnly).map { $0.sanitizedForDisplay() }
+            print("[CoachSave] Marketplace now has \(marketplaceCoaches.count) coaches (remote=\(remote.count))")
+
             let coachKey = portalProfile.coachUserID.isEmpty
-                ? portalProfile.id.uuidString
+                ? (Auth.auth().currentUser?.uid ?? portalProfile.id.uuidString)
                 : portalProfile.coachUserID
             clientConnections = try await firestore.fetchCoachClientConnections(coachFirestoreID: coachKey)
         } catch {
-            // Local mock coaches remain available.
+            print("[CoachSave] Marketplace refresh FAILED: \(error)")
         }
     }
 
