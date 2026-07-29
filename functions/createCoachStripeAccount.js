@@ -7,9 +7,11 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { HttpsError } = require("firebase-functions/v2/https");
 const Stripe = require("stripe");
 
-const STRIPE_ONBOARDING_RETURN_URL = "syncfit://stripe-onboarding-return";
+// https Hosting bridge → syncfit:// (Stripe requires http(s) Account Link URLs).
+const STRIPE_ONBOARDING_RETURN_URL =
+  "https://syncfit-8441f.web.app/stripe-onboarding-return/";
 const STRIPE_ONBOARDING_REFRESH_URL =
-  "syncfit://stripe-onboarding-return?refresh=1";
+  "https://syncfit-8441f.web.app/stripe-onboarding-return/?refresh=1";
 
 /**
  * @param {string} secretKey

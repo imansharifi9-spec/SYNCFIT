@@ -41,6 +41,28 @@ function validMonthlyPriceCents(value) {
   return Number.isInteger(value) && value > 0 && value <= 99999999;
 }
 
+/**
+ * Coach docs store `pricePerMonth` as whole dollars (UI: "$75/month").
+ * Stripe Checkout needs cents.
+ */
+function resolveMonthlyPriceCents(coachData) {
+  const dollars = coachData && coachData.pricePerMonth;
+  if (!Number.isInteger(dollars) || dollars <= 0 || dollars > 9999) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Coach monthly price is invalid."
+    );
+  }
+  const cents = dollars * 100;
+  if (!validMonthlyPriceCents(cents)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Coach monthly price is invalid."
+    );
+  }
+  return cents;
+}
+
 async function hasDuplicateActiveSubscription(db, clientUid, coachUid) {
   const snapshot = await db
     .collection("coachSubscriptions")
@@ -96,12 +118,7 @@ async function createCheckoutSessionForUid(clientUid, data, deps = {}) {
       "Coach Stripe account is not configured."
     );
   }
-  if (!validMonthlyPriceCents(coachData.monthlyPriceCents)) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Coach monthly price is invalid."
-    );
-  }
+  const monthlyPriceCents = resolveMonthlyPriceCents(coachData);
 
   const platformFeePercent = resolvePlatformFeePercent(coachData);
   if (await hasDuplicateActiveSubscription(db, clientUid, coachUid)) {
@@ -132,7 +149,7 @@ async function createCheckoutSessionForUid(clientUid, data, deps = {}) {
         quantity: 1,
         price_data: {
           currency: "usd",
-          unit_amount: coachData.monthlyPriceCents,
+          unit_amount: monthlyPriceCents,
           recurring: { interval: "month" },
           product_data: {
             name:
@@ -158,7 +175,7 @@ async function createCheckoutSessionForUid(clientUid, data, deps = {}) {
   if (!session || typeof session.url !== "string" || !session.url) {
     throw new HttpsError("internal", "Stripe Checkout returned no URL.");
   }
-  return { url: session.url };
+  return { url: session.url, sessionId: session.id };
 }
 
 module.exports = {
@@ -168,5 +185,6 @@ module.exports = {
   resolvePlatformFeePercent,
   validStripeAccountId,
   validMonthlyPriceCents,
+  resolveMonthlyPriceCents,
   createCheckoutSessionForUid,
 };

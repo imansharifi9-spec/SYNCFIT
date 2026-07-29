@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SyncFit</title>
+    <script>
+      (function () {
+        var search = window.location.search || "";
+        var target = "syncfit://stripe-onboarding-return" + search;
+        // Immediate bridge: https Hosting → custom scheme for ASWebAuthenticationSession.
+        window.location.replace(target);
+      })();
+    </script>
+  </head>
+  <body>
+    <p>Returning to SyncFit…</p>
+    <p>
+      <a id="fallback" href="syncfit://stripe-onboarding-return">Continue</a>
+    </p>
+    <script>
+      (function () {
+        var search = window.location.search || "";
+        var target = "syncfit://stripe-onboarding-return" + search;
+        var link = document.getElementById("fallback");
+        if (link) link.setAttribute("href", target);
+      })();
+    </script>
+  </body>
+</html>

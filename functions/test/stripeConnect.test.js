@@ -200,7 +200,7 @@ describe("createCheckoutSession", function () {
       name: "Checkout Coach",
       stripeConnectedAccountId: "acct_checkout123",
       stripeChargesEnabled: true,
-      monthlyPriceCents: 12500,
+      pricePerMonth: 125,
     });
   });
 
@@ -284,6 +284,7 @@ describe("createCheckoutSession", function () {
       clientUid,
       {
         coachUid,
+        pricePerMonth: 1,
         monthlyPriceCents: 1,
         stripeConnectedAccountId: "acct_attacker",
         platformFeePercent: 0,
