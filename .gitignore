@@ -31,3 +31,8 @@ ios/**/xcuserdata/
 
 # Logs
 *.log
+
+# Local screenshot dumps / Firebase CLI cache (never track)
+tmp-cta-green/
+tmp-orb-preview/
+.firebase/
