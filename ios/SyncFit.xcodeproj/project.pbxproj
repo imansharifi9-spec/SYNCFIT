@@ -12,6 +12,12 @@
 		A10000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppState.swift */; };
 		A10000000000000000000003 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* UserProfile.swift */; };
 		A10000000000000000000004 /* SyncFitTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* SyncFitTheme.swift */; };
+		E10000000000000000000001 /* ExerciseMediaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* ExerciseMediaService.swift */; };
+		E10000000000000000000002 /* ExerciseDemoGIFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* ExerciseDemoGIFView.swift */; };
+		E10000000000000000000003 /* ExerciseMediaDiag.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* ExerciseMediaDiag.swift */; };
+		E10000000000000000000004 /* ExerciseThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* ExerciseThumbnailCache.swift */; };
+		E10000000000000000000005 /* ExerciseThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000005 /* ExerciseThumbnailView.swift */; };
+		E10000000000000000000006 /* ExerciseMediaCacheVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000006 /* ExerciseMediaCacheVersion.swift */; };
 		A10000000000000000000005 /* FitnessDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* FitnessDataStore.swift */; };
 		A10000000000000000000006 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* RootView.swift */; };
 		A10000000000000000000007 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* MainTabView.swift */; };
@@ -112,6 +118,12 @@
 		A20000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* SyncFitTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFitTheme.swift; sourceTree = "<group>"; };
+		E20000000000000000000001 /* ExerciseMediaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaService.swift; sourceTree = "<group>"; };
+		E20000000000000000000002 /* ExerciseDemoGIFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseDemoGIFView.swift; sourceTree = "<group>"; };
+		E20000000000000000000003 /* ExerciseMediaDiag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaDiag.swift; sourceTree = "<group>"; };
+		E20000000000000000000004 /* ExerciseThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseThumbnailCache.swift; sourceTree = "<group>"; };
+		E20000000000000000000005 /* ExerciseThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseThumbnailView.swift; sourceTree = "<group>"; };
+		E20000000000000000000006 /* ExerciseMediaCacheVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaCacheVersion.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* FitnessDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessDataStore.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
@@ -282,6 +294,10 @@
 			children = (
 				A20000000000000000000005 /* FitnessDataStore.swift */,
 				A20000000000000000000019 /* SampleDataSeeder.swift */,
+				E20000000000000000000001 /* ExerciseMediaService.swift */,
+				E20000000000000000000003 /* ExerciseMediaDiag.swift */,
+				E20000000000000000000004 /* ExerciseThumbnailCache.swift */,
+				E20000000000000000000006 /* ExerciseMediaCacheVersion.swift */,
 				A20000000000000000000027 /* AIInsightService.swift */,
 				A20000000000000000000031 /* USDAFoodDataCentralService.swift */,
 				A20000000000000000000059 /* NutritionixService.swift */,
@@ -362,6 +378,8 @@
 				A20000000000000000000025 /* WorkoutRoutineSheets.swift */,
 				A20000000000000000000039 /* WorkoutScheduleViews.swift */,
 				A20000000000000000000029 /* ExerciseIllustrationView.swift */,
+				E20000000000000000000002 /* ExerciseDemoGIFView.swift */,
+				E20000000000000000000005 /* ExerciseThumbnailView.swift */,
 				A20000000000000000000053 /* AddExerciseSheet.swift */,
 				A20000000000000000000054 /* SyncFitAICoachCard.swift */,
 			);
@@ -595,6 +613,12 @@
 				A10000000000000000000015 /* SettingsView.swift in Sources */,
 				A10000000000000000000017 /* FitnessModels.swift in Sources */,
 				A10000000000000000000018 /* SampleDataSeeder.swift in Sources */,
+				E10000000000000000000001 /* ExerciseMediaService.swift in Sources */,
+				E10000000000000000000003 /* ExerciseMediaDiag.swift in Sources */,
+				E10000000000000000000004 /* ExerciseThumbnailCache.swift in Sources */,
+				E10000000000000000000006 /* ExerciseMediaCacheVersion.swift in Sources */,
+				E10000000000000000000005 /* ExerciseThumbnailView.swift in Sources */,
+				E10000000000000000000002 /* ExerciseDemoGIFView.swift in Sources */,
 				A10000000000000000000019 /* ExerciseLibrary.swift in Sources */,
 				A10000000000000000000020 /* NutritionSheets.swift in Sources */,
 				A10000000000000000000067 /* MacroSummaryViews.swift in Sources */,

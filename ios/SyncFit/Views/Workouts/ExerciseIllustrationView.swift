@@ -237,6 +237,11 @@ struct ExerciseSearchRow: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
+                ExerciseThumbnailView(
+                    exerciseName: exercise.name,
+                    muscleGroup: exercise.muscleGroup
+                )
+
                 VStack(alignment: .leading, spacing: 3) {
                     Text(exercise.name)
                         .font(.body.weight(.medium))

@@ -11,12 +11,25 @@ enum SampleDataSeeder {
     private static func seedExercisesIfNeeded(context: ModelContext) {
         let descriptor = FetchDescriptor<ExerciseRecord>()
         let existing = (try? context.fetch(descriptor)) ?? []
-        guard existing.isEmpty else { return }
 
-        for exercise in ExerciseLibrary.exercises {
-            context.insert(ExerciseRecord(from: exercise))
+        if existing.isEmpty {
+            for exercise in ExerciseLibrary.exercises {
+                context.insert(ExerciseRecord(from: exercise))
+            }
+            try? context.save()
+            return
         }
-        try? context.save()
+
+        // Upsert catalog expansions onto installs that already seeded an older library.
+        let existingNames = Set(existing.map { $0.name.lowercased() })
+        var inserted = 0
+        for exercise in ExerciseLibrary.exercises where !existingNames.contains(exercise.name.lowercased()) {
+            context.insert(ExerciseRecord(from: exercise))
+            inserted += 1
+        }
+        if inserted > 0 {
+            try? context.save()
+        }
     }
 
     private static func seedDemoContentIfNeeded(context: ModelContext) {
