@@ -277,7 +277,7 @@ private struct NutritionLogFoodStickyCTA: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(SyncFitTheme.accentBright)
+                    .background(SyncFitTheme.primaryAction)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .padding(.horizontal, 16)

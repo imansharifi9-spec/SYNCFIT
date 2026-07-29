@@ -18,7 +18,7 @@ enum RoutineDisplayName {
 
 private enum ActiveSessionColors {
     static let inputBlock = Color(red: 0.102, green: 0.102, blue: 0.102)
-    static let logButton = Color(red: 0.361, green: 0.859, blue: 0.431)
+    static let logButton = SyncFitTheme.primaryAction
 }
 
 struct ActiveWorkoutSessionView: View {

@@ -4,8 +4,8 @@ enum CoachUIColor {
     static let page = Color(red: CoachStyle.pageBackground.red, green: CoachStyle.pageBackground.green, blue: CoachStyle.pageBackground.blue)
     static let card = Color(red: CoachStyle.cardBackground.red, green: CoachStyle.cardBackground.green, blue: CoachStyle.cardBackground.blue)
     static let border = Color(red: CoachStyle.cardBorder.red, green: CoachStyle.cardBorder.green, blue: CoachStyle.cardBorder.blue)
-    static let accent = Color(red: CoachStyle.accentGreen.red, green: CoachStyle.accentGreen.green, blue: CoachStyle.accentGreen.blue)
-    static let chipActive = Color(red: 92 / 255, green: 219 / 255, blue: 110 / 255)
+    static let accent = SyncFitTheme.primaryAction
+    static let chipActive = SyncFitTheme.primaryAction
     static let chipInactiveBackground = Color(red: 26 / 255, green: 26 / 255, blue: 26 / 255)
     static let chipInactiveText = Color(red: 102 / 255, green: 102 / 255, blue: 102 / 255)
     static let chipInactiveBorder = Color(red: 42 / 255, green: 42 / 255, blue: 42 / 255)

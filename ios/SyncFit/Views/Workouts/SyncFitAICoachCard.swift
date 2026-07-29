@@ -3,7 +3,7 @@ import SwiftUI
 private enum CoachCardColors {
     static let background = Color(red: 15 / 255, green: 26 / 255, blue: 15 / 255)
     static let border = Color(red: 30 / 255, green: 58 / 255, blue: 30 / 255)
-    static let accent = Color(red: 92 / 255, green: 219 / 255, blue: 110 / 255)
+    static let accent = SyncFitTheme.primaryAction
     static let mutedGreen = Color(red: 58 / 255, green: 90 / 255, blue: 58 / 255)
     static let pillBackground = Color(red: 26 / 255, green: 58 / 255, blue: 26 / 255)
     static let statBackground = Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)

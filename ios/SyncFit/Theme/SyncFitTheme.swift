@@ -1,6 +1,10 @@
 import SwiftUI
 
 enum SyncFitTheme {
+    /// Canonical primary-action green (Home "Start workout", sticky CTAs, PrimaryButtonStyle).
+    /// RGB(92, 219, 110) / #5CDB6E — the deeper SyncFit brand green.
+    static let primaryAction = Color(red: 92 / 255, green: 219 / 255, blue: 110 / 255)
+
     static let accent = Color(red: 0.18, green: 0.72, blue: 0.45)
     static let accentBright = Color(red: 0.32, green: 0.92, blue: 0.58)
     static let accentDark = Color(red: 0.10, green: 0.48, blue: 0.32)
@@ -80,7 +84,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding()
-            .background(SyncFitTheme.accent.opacity(configuration.isPressed ? 0.8 : 1))
+            .background(SyncFitTheme.primaryAction.opacity(configuration.isPressed ? 0.8 : 1))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
@@ -197,7 +201,7 @@ struct CalorieGoalDisplay {
 }
 
 enum ConsistencyVisualStyle {
-    static let workoutGreen = Color(red: 92 / 255, green: 219 / 255, blue: 110 / 255)
+    static let workoutGreen = SyncFitTheme.primaryAction
     static let proteinBlue = Color(red: 106 / 255, green: 171 / 255, blue: 238 / 255)
     static let emptyDot = Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255)
     static let labelMuted = Color(red: 136 / 255, green: 136 / 255, blue: 136 / 255)

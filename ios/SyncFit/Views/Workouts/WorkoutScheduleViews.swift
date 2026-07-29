@@ -142,7 +142,7 @@ struct UnassignedDayHeroCard: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(SyncFitTheme.accentBright)
+                    .background(SyncFitTheme.primaryAction)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -150,7 +150,7 @@ struct UnassignedDayHeroCard: View {
             Button(action: onLogAdHoc) {
                 Text("Log exercises anyway")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(SyncFitTheme.accentBright)
+                    .foregroundStyle(SyncFitTheme.primaryAction)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
             }
