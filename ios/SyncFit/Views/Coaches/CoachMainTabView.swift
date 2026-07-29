@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import FirebaseAuth
 
 enum CoachPortalTab: Hashable {
     case profile
@@ -10,7 +11,19 @@ enum CoachPortalTab: Hashable {
 }
 
 struct CoachMainTabView: View {
+    @EnvironmentObject private var chatService: CoachChatService
+    @EnvironmentObject private var coachService: CoachService
     @State private var selectedTab: CoachPortalTab = .profile
+
+    private var coachParticipantId: String {
+        // Always prefer live Auth uid. Never fall back to portalProfile.id.uuidString —
+        // that placeholder would wipe the shared conversations listener.
+        if let uid = Auth.auth().currentUser?.uid,
+           CoachChatService.isValidConversationParticipantId(uid) {
+            return uid
+        }
+        return coachService.portalProfile.coachUserID
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -24,6 +37,7 @@ struct CoachMainTabView: View {
 
             CoachMessagesTab()
                 .tabItem { Label("Messages", systemImage: "bubble.left.and.bubble.right.fill") }
+                .badge(chatService.hasUnreadMessages ? "" : nil)
                 .tag(CoachPortalTab.messages)
 
             CoachPreviewTab(selectedTab: $selectedTab)
@@ -31,6 +45,11 @@ struct CoachMainTabView: View {
                 .tag(CoachPortalTab.preview)
         }
         .tint(CoachUIColor.accent)
+        .onAppear {
+            if CoachChatService.isValidConversationParticipantId(coachParticipantId) {
+                chatService.startUnreadMonitoring(for: coachParticipantId)
+            }
+        }
     }
 }
 
@@ -489,15 +508,24 @@ struct CoachMessagesTab: View {
     @EnvironmentObject private var chatService: CoachChatService
     @State private var selectedConversation: ChatConversation?
 
-    private var coachId: String {
-        coachService.portalProfile.coachUserID.isEmpty
-            ? coachService.portalProfile.id.uuidString
-            : coachService.portalProfile.coachUserID
+    /// Auth-backed participant for unread dots + conversation listener.
+    /// Never uses `portalProfile.id.uuidString` (placeholder wipe bug).
+    private var coachParticipantId: String {
+        if let uid = Auth.auth().currentUser?.uid,
+           CoachChatService.isValidConversationParticipantId(uid) {
+            return uid
+        }
+        let portal = coachService.portalProfile.coachUserID
+        return CoachChatService.isValidConversationParticipantId(portal) ? portal : ""
     }
 
     var body: some View {
         NavigationStack {
-            Group {
+            ZStack {
+                // Full-bleed page color — empty VStack alone leaves NavigationStack's
+                // default gray content column visible as a center strip.
+                CoachUIColor.page.ignoresSafeArea()
+
                 if chatService.conversations.isEmpty {
                     VStack {
                         Spacer()
@@ -506,33 +534,47 @@ struct CoachMessagesTab: View {
                             .foregroundStyle(CoachUIColor.muted)
                         Spacer()
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List(chatService.conversations) { conversation in
                         Button {
                             selectedConversation = conversation
                         } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(conversation.userName)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                    Spacer()
-                                    Text(conversation.lastMessageAt.formatted(date: .omitted, time: .shortened))
-                                        .font(.system(size: 9))
+                            HStack(alignment: .top, spacing: 8) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(conversation.userName)
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                        Spacer()
+                                        Text(conversation.lastMessageAt.formatted(date: .omitted, time: .shortened))
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(CoachUIColor.muted)
+                                    }
+                                    Text(conversation.lastMessage)
+                                        .font(.system(size: 11))
                                         .foregroundStyle(CoachUIColor.muted)
+                                        .lineLimit(1)
                                 }
-                                Text(conversation.lastMessage)
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(CoachUIColor.muted)
-                                    .lineLimit(1)
+
+                                if !coachParticipantId.isEmpty,
+                                   conversation.isUnread(for: coachParticipantId) {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                        .padding(.top, 4)
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
                         .listRowBackground(CoachUIColor.card)
                     }
+                    .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                 }
             }
-            .background(CoachUIColor.page)
+            .toolbarBackground(CoachUIColor.page, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationTitle("Messages")
             .navigationDestination(item: $selectedConversation) { conversation in
                 CoachChatView(
@@ -546,10 +588,14 @@ struct CoachMessagesTab: View {
                 )
             }
             .onAppear {
-                chatService.observeConversations(forParticipant: coachId)
-            }
-            .onDisappear {
-                chatService.stopObservingConversations()
+                // Keep the shared unread listener alive across tabs — do not tear it down here.
+                // Skip attach entirely when Auth uid / coachUserID is not ready yet (never UUID).
+                let participant = coachParticipantId
+                guard CoachChatService.isValidConversationParticipantId(participant) else {
+                    print("[ChatSync] Messages tab skip observe — no Auth-backed participant yet")
+                    return
+                }
+                chatService.observeConversations(forParticipant: participant)
             }
         }
     }

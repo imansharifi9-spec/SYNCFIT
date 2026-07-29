@@ -128,23 +128,26 @@ struct CoachChatView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 8)
             }
+            // Match Profile / Clients: hide system scroll chrome so page black shows through.
+            .scrollContentBackground(.hidden)
+            .background(CoachUIColor.page)
             .scrollDismissesKeyboard(.interactively)
-                .onAppear {
-                    chatService.startObservingMessages(
-                        conversationId: conversationId,
-                        coachId: coachId,
-                        userId: userId
-                    )
-                    scrollToBottom(proxy, animated: false)
-                    Task {
-                        if let currentUserId {
-                            await chatService.markConversationRead(
-                                conversationId: conversationId,
-                                currentUserId: currentUserId
-                            )
-                        }
+            .onAppear {
+                chatService.startObservingMessages(
+                    conversationId: conversationId,
+                    coachId: coachId,
+                    userId: userId
+                )
+                scrollToBottom(proxy, animated: false)
+                Task {
+                    if let currentUserId {
+                        await chatService.markConversationRead(
+                            conversationId: conversationId,
+                            currentUserId: currentUserId
+                        )
                     }
                 }
+            }
             .onChange(of: chatService.messages) { _, _ in
                 scrollToBottom(proxy)
             }
@@ -158,6 +161,8 @@ struct CoachChatView: View {
             inputBar
         }
         .background(CoachUIColor.page)
+        .toolbarBackground(CoachUIColor.page, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {

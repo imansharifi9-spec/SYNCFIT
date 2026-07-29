@@ -93,6 +93,7 @@
 		T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */; };
 		E10000000000000000000008 /* DeleteAccountErrorMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000008 /* DeleteAccountErrorMapper.swift */; };
 		T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */; };
+		T11000000000000000000001 /* CoachChatListenerLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -193,6 +194,7 @@
 		T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachCheckoutCallbackValidatorTests.swift; sourceTree = "<group>"; };
 		E20000000000000000000008 /* DeleteAccountErrorMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountErrorMapper.swift; sourceTree = "<group>"; };
 		T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountErrorMapperTests.swift; sourceTree = "<group>"; };
+		T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachChatListenerLifecycleTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -436,6 +438,7 @@
 			children = (
 				T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */,
 				T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */,
+				T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */,
 			);
 			path = SyncFitTests;
 			sourceTree = "<group>";
@@ -657,6 +660,7 @@
 			files = (
 				T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */,
 				T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */,
+				T11000000000000000000001 /* CoachChatListenerLifecycleTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
