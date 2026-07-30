@@ -7,9 +7,11 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if !authManager.hasResolvedInitialAuthState || appState.isRestoringSession {
+            if shouldHoldLaunchLoading {
                 // Hold on loading until auth resolves AND cloud onboarding state is restored.
                 // Prevents a flash of OnboardingView / ProgramOnboardingFlow for returning users.
+                // Also covers the cold-launch gap where auth is ready but syncUserSession has
+                // not started yet — otherwise Messages attaches and sticks on Code=7.
                 launchLoadingView
             } else if !authManager.isAuthenticated {
                 AuthView()
@@ -26,6 +28,17 @@ struct RootView: View {
             FirebaseConfiguration.configureIfNeeded()
             authManager.startIfNeeded()
         }
+    }
+
+    /// Auth still resolving, cloud restore in progress, or authenticated but the
+    /// first session sync of this launch has not finished yet.
+    private var shouldHoldLaunchLoading: Bool {
+        if !authManager.hasResolvedInitialAuthState { return true }
+        if appState.isRestoringSession { return true }
+        if authManager.isAuthenticated && !appState.hasFinishedSessionRestoreThisLaunch {
+            return true
+        }
+        return false
     }
 
     private var launchLoadingView: some View {

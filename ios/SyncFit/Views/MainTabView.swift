@@ -27,6 +27,11 @@ struct MainTabView: View {
         .onChange(of: coachService.isCoachModeActive) { _, _ in
             Task { await startUnreadMonitoringIfNeeded() }
         }
+        .onChange(of: appState.isRestoringSession) { _, restoring in
+            if !restoring {
+                chatService.retryConversationsMonitoringAfterSessionRestoreIfNeeded()
+            }
+        }
     }
 
     private var unreadMonitorKey: String {
@@ -66,6 +71,20 @@ struct MainTabView: View {
     }
 
     private func startUnreadMonitoringIfNeeded() async {
+        let authUID = Auth.auth().currentUser?.uid ?? ""
+        let portal = coachService.portalProfile.coachUserID
+        let portalID = coachService.portalProfile.id.uuidString
+        let line =
+            "[ChatSync] MainTab startUnreadMonitoringIfNeeded " +
+            "authenticated=\(authManager.isAuthenticated) " +
+            "coachMode=\(coachService.isCoachModeActive) " +
+            "authUID=\(authUID.isEmpty ? "(nil)" : authUID) " +
+            "portalCoachUserID=\(portal.isEmpty ? "(empty)" : portal) " +
+            "portalProfile.id=\(portalID) " +
+            "portalCoachUserIDValid=\(CoachChatService.isValidConversationParticipantId(portal))"
+        print(line)
+        NSLog("%@", line)
+
         guard authManager.isAuthenticated,
               let uid = Auth.auth().currentUser?.uid else { return }
 
@@ -75,9 +94,11 @@ struct MainTabView: View {
             let portal = coachService.portalProfile.coachUserID
             let coachId = CoachChatService.isValidConversationParticipantId(portal) ? portal : uid
             guard CoachChatService.isValidConversationParticipantId(coachId) else { return }
+            NSLog("[ChatSync] MainTab calling startUnreadMonitoring coachId=%@", coachId)
             chatService.startUnreadMonitoring(for: coachId)
         } else {
             guard CoachChatService.isValidConversationParticipantId(uid) else { return }
+            NSLog("[ChatSync] MainTab calling startUnreadMonitoring clientUid=%@", uid)
             chatService.startUnreadMonitoring(for: uid)
         }
     }

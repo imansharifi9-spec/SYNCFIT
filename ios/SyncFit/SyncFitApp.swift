@@ -57,12 +57,15 @@ struct SyncFitApp: App {
                     configureIntegrations()
                     subscriptionManager.start()
                     if authManager.isAuthenticated {
+                        // Hold MainTab until sync finishes (RootView gates on this).
+                        appState.beginSessionRestore()
                         await syncUserSession()
                         await subscriptionManager.recheckEntitlementsAfterLogin()
                     }
                 }
                 .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
                     if isAuthenticated {
+                        appState.beginSessionRestore()
                         Task {
                             await syncUserSession()
                             await subscriptionManager.recheckEntitlementsAfterLogin()
@@ -114,7 +117,12 @@ struct SyncFitApp: App {
     private func syncUserSession() async {
         // Always clear the restore gate, even on early exits / failures.
         appState.beginSessionRestore()
-        defer { appState.endSessionRestore() }
+        defer {
+            appState.endSessionRestore()
+            // Cold-launch conversations attach can fail with Code=7 before Auth token
+            // is accepted by rules — retry once session restore has finished.
+            chatService.retryConversationsMonitoringAfterSessionRestoreIfNeeded()
+        }
 
         guard authManager.isAuthenticated,
               let uid = authManager.user?.uid else {
@@ -131,6 +139,12 @@ struct SyncFitApp: App {
         // signing-in UID — including nil (upgrade path / leftover data with no owner).
         let localOwner = AuthenticationManager.localDataOwnerUserID
         let mustWipeLocalCache = localOwner != uid
+        NSLog(
+            "[ChatSync] syncUserSession uid=%@ localOwner=%@ mustWipe=%@",
+            uid,
+            localOwner ?? "(nil)",
+            mustWipeLocalCache ? "YES" : "NO"
+        )
 
         if mustWipeLocalCache {
             print("[AuthScope] Local cache owned by \(localOwner ?? "nil") — wiping for uid=\(uid)")

@@ -192,4 +192,72 @@ final class CoachChatListenerLifecycleTests: XCTestCase {
         XCTAssertNil(service.unreadMonitorParticipantIdForTesting)
         XCTAssertEqual(service.conversationsObservationGenerationForTesting, 0)
     }
+
+    // MARK: - Cold-launch attach failure recovery
+
+    func testFailedInitialAttachDoesNotCountAsSettledAlreadyAttached() {
+        let service = CoachChatService()
+        let authUID = "0FdAAhmqYuWbHz5itJLR8q2hGVj2"
+        _ = service.beginConversationsObservationSessionForTesting(participantId: authUID)
+
+        // Reproduce the stuck cold-launch gate: participant bound, "listener" present,
+        // but initial attach failed (never healthy).
+        service.noteConversationsInitialAttachFailedForTesting(participantId: authUID)
+
+        XCTAssertFalse(
+            service.conversationsListenerHealthyForTesting,
+            "Failed attach must not mark the listener healthy"
+        )
+        XCTAssertFalse(
+            service.shouldSkipConversationsAttachForTesting(participantId: authUID),
+            "Unhealthy attach must not hit the already-attached early return"
+        )
+
+        service.noteConversationsAttachSucceededForTesting()
+        XCTAssertTrue(service.conversationsListenerHealthyForTesting)
+        XCTAssertTrue(
+            service.shouldSkipConversationsAttachForTesting(participantId: authUID),
+            "Healthy attach should skip redundant re-attach for the same participant"
+        )
+        service.clearConversationsListenerTestOverrides()
+    }
+
+    func testSessionRestoreRetryRestartsAfterFailedColdLaunchAttach() {
+        let service = CoachChatService()
+        let authUID = "0FdAAhmqYuWbHz5itJLR8q2hGVj2"
+        let genBefore = service.beginConversationsObservationSessionForTesting(participantId: authUID) ?? 0
+        service.noteConversationsInitialAttachFailedForTesting(participantId: authUID)
+        XCTAssertFalse(service.shouldSkipConversationsAttachForTesting(participantId: authUID))
+
+        // Session restore completion must clear the failed identity and allow a new session.
+        // Without Firestore this only verifies the retry path clears skip state / bumps gen
+        // when startUnreadMonitoring can attach; here we assert the preconditions the
+        // production retry uses before calling startUnreadMonitoring.
+        XCTAssertEqual(service.unreadMonitorParticipantIdForTesting, authUID)
+        XCTAssertFalse(service.conversationsListenerHealthyForTesting)
+
+        // Simulate the retry clearing identity (same as production retry entry).
+        service.clearConversationsListenerTestOverrides()
+        // Production retry sets unreadMonitorParticipantId = nil then startUnreadMonitoring.
+        // Verify a fresh begin after failure advances generation.
+        let genAfter = service.beginConversationsObservationSessionForTesting(participantId: authUID)
+        XCTAssertNotNil(genAfter)
+        XCTAssertGreaterThan(genAfter ?? 0, genBefore)
+    }
+
+    func testPendingRetryPreventsStampedeReattach() {
+        let service = CoachChatService()
+        let authUID = "0FdAAhmqYuWbHz5itJLR8q2hGVj2"
+        service.noteConversationsInitialAttachFailedForTesting(participantId: authUID)
+        service.noteConversationsRetryTaskPendingForTesting(participantId: authUID)
+
+        XCTAssertFalse(service.shouldSkipConversationsAttachForTesting(participantId: authUID))
+        XCTAssertTrue(
+            service.shouldWaitForPendingConversationsRetryForTesting(participantId: authUID),
+            "Concurrent onAppear must wait for the scheduled cold-launch retry instead of thrashing"
+        )
+        service.clearConversationsListenerTestOverrides()
+        // Cancel the long-sleep test task.
+        service.stopObservingConversations()
+    }
 }

@@ -13,7 +13,14 @@ enum CoachPortalTab: Hashable {
 struct CoachMainTabView: View {
     @EnvironmentObject private var chatService: CoachChatService
     @EnvironmentObject private var coachService: CoachService
-    @State private var selectedTab: CoachPortalTab = .profile
+    @State private var selectedTab: CoachPortalTab = {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-CoachOpenMessages") {
+            return .messages
+        }
+        #endif
+        return .profile
+    }()
 
     private var coachParticipantId: String {
         // Always prefer live Auth uid. Never fall back to portalProfile.id.uuidString —
@@ -46,8 +53,20 @@ struct CoachMainTabView: View {
         }
         .tint(CoachUIColor.accent)
         .onAppear {
+            let authUID = Auth.auth().currentUser?.uid ?? ""
+            let portal = coachService.portalProfile.coachUserID
+            let resolved = coachParticipantId
+            NSLog(
+                "[ChatSync] CoachMainTab onAppear authUID=%@ portalCoachUserID=%@ resolved=%@ portal.id=%@",
+                authUID.isEmpty ? "(nil)" : authUID,
+                portal.isEmpty ? "(empty)" : portal,
+                resolved.isEmpty ? "(empty)" : resolved,
+                coachService.portalProfile.id.uuidString
+            )
             if CoachChatService.isValidConversationParticipantId(coachParticipantId) {
                 chatService.startUnreadMonitoring(for: coachParticipantId)
+            } else {
+                NSLog("[ChatSync] CoachMainTab onAppear SKIP invalid participant=%@", resolved)
             }
         }
     }
@@ -733,8 +752,19 @@ struct CoachMessagesTab: View {
                 // Keep the shared unread listener alive across tabs — do not tear it down here.
                 // Skip attach entirely when Auth uid / coachUserID is not ready yet (never UUID).
                 let participant = coachParticipantId
+                let authUID = Auth.auth().currentUser?.uid ?? ""
+                let portal = coachService.portalProfile.coachUserID
+                NSLog(
+                    "[ChatSync] MessagesTab onAppear authUID=%@ portalCoachUserID=%@ resolved=%@ portal.id=%@ conversations=%d",
+                    authUID.isEmpty ? "(nil)" : authUID,
+                    portal.isEmpty ? "(empty)" : portal,
+                    participant.isEmpty ? "(empty)" : participant,
+                    coachService.portalProfile.id.uuidString,
+                    chatService.conversations.count
+                )
                 guard CoachChatService.isValidConversationParticipantId(participant) else {
                     print("[ChatSync] Messages tab skip observe — no Auth-backed participant yet")
+                    NSLog("[ChatSync] MessagesTab SKIP invalid participant")
                     return
                 }
                 chatService.observeConversations(forParticipant: participant)

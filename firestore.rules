@@ -96,8 +96,11 @@ service cloud.firestore {
     }
 
     function isConversationReadAllowed() {
+      // NOTE: Do not add `resource.data.participants is list` here.
+      // That type check is not implied by an array-contains query, so Firestore
+      // rejects the entire conversations list query with permission-denied even
+      // for signed-in participants. `uid in participants` already requires a list.
       return request.auth != null
-        && resource.data.participants is list
         && request.auth.uid in resource.data.participants;
     }
 

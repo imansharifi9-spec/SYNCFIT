@@ -97,6 +97,29 @@ final class CoachChatService: ObservableObject {
     private var conversationsListener: ListenerRegistration?
     private var unreadMonitorParticipantId: String?
 
+    /// True only after a successful (non-error) conversations snapshot or server hydrate.
+    /// A permission-denied attach must NOT count as settled — otherwise cold launch sticks empty.
+    private var conversationsListenerHealthy = false
+    /// True from the moment we decide to attach until healthy or failed.
+    /// Prevents concurrent MainTab / Messages onAppear from thrashing generations.
+    private var conversationsAttachInFlight = false
+    /// Participant to retry after a failed initial attach / hydrate (cold-launch window).
+    private var conversationsRetryParticipantId: String?
+    private var conversationsColdLaunchRetryCount = 0
+    private var conversationsRetryTask: Task<Void, Never>?
+
+    private static let maxColdLaunchAttachRetries = 6
+    /// Delays (ns) for bounded cold-launch retries after Code=7 / attach errors.
+    /// Spans ~20s — long enough for Auth↔Firestore to settle after cold Cmd+R.
+    private static let coldLaunchRetryDelaysNs: [UInt64] = [
+        500_000_000,
+        1_000_000_000,
+        2_000_000_000,
+        3_000_000_000,
+        5_000_000_000,
+        8_000_000_000
+    ]
+
     /// Bumps on every messages start/stop so overlapping shell→attach Tasks cannot
     /// write after teardown (same pattern as `CoachClientDataViewModel`).
     private var messagesObservationGeneration = 0
@@ -296,6 +319,62 @@ final class CoachChatService: ObservableObject {
 
     /// Participant currently bound to the conversations listener, if any (unit tests).
     var unreadMonitorParticipantIdForTesting: String? { unreadMonitorParticipantId }
+
+    /// Whether the conversations listener has received a successful snapshot (unit tests).
+    var conversationsListenerHealthyForTesting: Bool { conversationsListenerHealthy }
+
+    /// Mirrors the production early-return gate (unit tests).
+    func shouldSkipConversationsAttachForTesting(participantId: String) -> Bool {
+        shouldSkipConversationsAttach(for: participantId.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// Simulates "listener pointer present but initial attach failed" (unit tests).
+    func noteConversationsInitialAttachFailedForTesting(participantId: String) {
+        let trimmed = participantId.trimmingCharacters(in: .whitespacesAndNewlines)
+        unreadMonitorParticipantId = trimmed
+        conversationsRetryParticipantId = trimmed
+        conversationsListenerHealthy = false
+        conversationsAttachInFlight = false
+        conversationsListenerPresentOverrideForTesting = true
+    }
+
+    /// Marks conversations monitoring healthy for early-return tests.
+    func noteConversationsAttachSucceededForTesting() {
+        conversationsListenerHealthy = true
+        conversationsAttachInFlight = false
+        conversationsRetryParticipantId = nil
+        conversationsColdLaunchRetryCount = 0
+        conversationsListenerPresentOverrideForTesting = true
+    }
+
+    /// Whether concurrent callers should wait because a retry is already scheduled (unit tests).
+    func shouldWaitForPendingConversationsRetryForTesting(participantId: String) -> Bool {
+        let trimmed = participantId.trimmingCharacters(in: .whitespacesAndNewlines)
+        return conversationsRetryParticipantId == trimmed
+            && !conversationsListenerHealthy
+            && conversationsRetryTask != nil
+    }
+
+    /// Marks a retry task as pending without sleeping (unit tests).
+    func noteConversationsRetryTaskPendingForTesting(participantId: String) {
+        let trimmed = participantId.trimmingCharacters(in: .whitespacesAndNewlines)
+        conversationsRetryParticipantId = trimmed
+        conversationsListenerHealthy = false
+        conversationsAttachInFlight = false
+        conversationsRetryTask = Task { try? await Task.sleep(nanoseconds: 60_000_000_000) }
+    }
+
+    func clearConversationsListenerTestOverrides() {
+        conversationsListenerPresentOverrideForTesting = nil
+    }
+
+    /// Session-restore retry entry point (unit tests).
+    func retryConversationsMonitoringAfterSessionRestoreIfNeededForTesting() {
+        retryConversationsMonitoringAfterSessionRestoreIfNeeded()
+    }
+
+    /// When non-nil, overrides `conversationsListener != nil` in the skip gate (unit tests).
+    private var conversationsListenerPresentOverrideForTesting: Bool?
 
     /// Simulates a late snapshot apply from a superseded attach Task (unit tests).
     func applyMessagesSnapshotForTesting(_ parsed: [ChatMessage], generation: Int) {
@@ -523,31 +602,143 @@ final class CoachChatService: ObservableObject {
     /// Never accepts a placeholder `UUID.uuidString` — that would wipe a good listener.
     func startUnreadMonitoring(for participantId: String) {
         let trimmed = participantId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let authUID = Auth.auth().currentUser?.uid ?? ""
+        let looksUUID = Self.looksLikePlaceholderUUID(trimmed)
+        let coldLine =
+            "[ChatSync] Unread monitor REQUEST participant=\(trimmed.isEmpty ? "(empty)" : trimmed) " +
+            "authUID=\(authUID.isEmpty ? "(nil)" : authUID) " +
+            "isValid=\(Self.isValidConversationParticipantId(trimmed)) " +
+            "looksPlaceholderUUID=\(looksUUID) " +
+            "authMatch=\(!authUID.isEmpty && authUID == trimmed) " +
+            "existingParticipant=\(unreadMonitorParticipantId ?? "(nil)") " +
+            "listenerAttached=\(conversationsListener != nil) " +
+            "healthy=\(conversationsListenerHealthy) inFlight=\(conversationsAttachInFlight) " +
+            "retryPending=\(conversationsRetryParticipantId != nil) " +
+            "conversations=\(conversations.count) " +
+            "gen=\(conversationsObservationGeneration)"
+        print(coldLine)
+        NSLog("%@", coldLine)
+        Self.appendProbeLog(coldLine)
+
         guard Self.isValidConversationParticipantId(trimmed) else {
             let line =
                 "[ChatSync] Unread monitor SKIP — rejected participant id " +
                 "(empty or placeholder UUID): \(participantId)"
             print(line)
+            NSLog("%@", line)
             Self.appendProbeLog(line)
             return
         }
-        guard let db else {
-            Self.appendProbeLog("[ChatSync] Unread monitor SKIP — Firestore unavailable")
+        guard db != nil else {
+            let line = "[ChatSync] Unread monitor SKIP — Firestore unavailable"
+            Self.appendProbeLog(line)
+            NSLog("%@", line)
             return
         }
-        if unreadMonitorParticipantId == trimmed, conversationsListener != nil {
+        if shouldSkipConversationsAttach(for: trimmed) {
             Self.appendProbeLog(
-                "[ChatSync] Unread monitor already attached participant=\(trimmed) " +
+                "[ChatSync] Unread monitor already attached (healthy) participant=\(trimmed) " +
                 "conversations=\(conversations.count)"
             )
             return
         }
 
+        // Attach already running — wait for healthy or failure+scheduled retry.
+        if conversationsAttachInFlight, unreadMonitorParticipantId == trimmed {
+            Self.appendProbeLog(
+                "[ChatSync] Unread monitor attach in flight — waiting participant=\(trimmed)"
+            )
+            return
+        }
+
+        // Failed attach with a retry already scheduled — do not stampede / burn budget.
+        if conversationsRetryParticipantId == trimmed,
+           !conversationsListenerHealthy,
+           conversationsRetryTask != nil {
+            Self.appendProbeLog(
+                "[ChatSync] Unread monitor retry pending — waiting participant=\(trimmed)"
+            )
+            return
+        }
+
+        // Kick async path so we can await an Auth ID token before Firestore attach.
+        conversationsAttachInFlight = true
+        unreadMonitorParticipantId = trimmed
+        Task { @MainActor in
+            await self.attachConversationsListenerAfterAuthReady(participantId: trimmed)
+        }
+    }
+
+    /// Ensures Firestore sees a usable Auth token, then attaches listener + server hydrate.
+    private func attachConversationsListenerAfterAuthReady(participantId: String) async {
+        let trimmed = participantId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Self.isValidConversationParticipantId(trimmed) else {
+            conversationsAttachInFlight = false
+            return
+        }
+        guard let db else {
+            conversationsAttachInFlight = false
+            return
+        }
+
+        // Prefer Auth uid match; still attach if portal coach id equals auth uid.
+        if let user = Auth.auth().currentUser {
+            do {
+                let token = try await user.getIDTokenResult(forcingRefresh: false)
+                Self.appendProbeLog(
+                    "[ChatSync] Unread monitor Auth token ready uid=\(user.uid) " +
+                    "exp=\(token.expirationDate.description)"
+                )
+            } catch {
+                Self.appendProbeLog(
+                    "[ChatSync] Unread monitor Auth token FAILED before attach: \(error) — will retry"
+                )
+                conversationsAttachInFlight = false
+                conversationsListenerHealthy = false
+                conversationsRetryParticipantId = trimmed
+                unreadMonitorParticipantId = trimmed
+                scheduleColdLaunchConversationsRetry(for: trimmed)
+                return
+            }
+        } else {
+            Self.appendProbeLog(
+                "[ChatSync] Unread monitor Auth.currentUser nil before attach — will retry"
+            )
+            conversationsAttachInFlight = false
+            conversationsListenerHealthy = false
+            conversationsRetryParticipantId = trimmed
+            unreadMonitorParticipantId = trimmed
+            scheduleColdLaunchConversationsRetry(for: trimmed)
+            return
+        }
+
+        // Another caller may have won the healthy race while we awaited the token.
+        if shouldSkipConversationsAttach(for: trimmed) {
+            conversationsAttachInFlight = false
+            Self.appendProbeLog(
+                "[ChatSync] Unread monitor already healthy after token wait participant=\(trimmed)"
+            )
+            return
+        }
+
+        if conversationsListener != nil, !conversationsListenerHealthy {
+            let line =
+                "[ChatSync] Unread monitor replacing unhealthy listener " +
+                "participant=\(trimmed) conversations=\(conversations.count)"
+            print(line)
+            NSLog("%@", line)
+            Self.appendProbeLog(line)
+            removeConversationsListener()
+        }
+
         beginNewConversationsObservationSession()
         let generation = conversationsObservationGeneration
         unreadMonitorParticipantId = trimmed
+        conversationsListenerHealthy = false
+        conversationsAttachInFlight = true
         let startLine = "[ChatSync] Unread monitor start participant=\(trimmed) gen=\(generation)"
         print(startLine)
+        NSLog("%@", startLine)
         Self.appendProbeLog(startLine)
 
         conversationsListener = db.collection("conversations")
@@ -558,7 +749,17 @@ final class CoachChatService: ObservableObject {
                     let errLine = "[ChatSync] Unread monitor FAILED: \(error)"
                     print(errLine)
                     Self.appendProbeLog(errLine)
-                    // Keep last good conversations — do not wipe on stream errors.
+                    Task { @MainActor in
+                        #if DEBUG
+                        await self.probeFirestoreAuthVsConversations(participantId: trimmed)
+                        #endif
+                        self.handleConversationsInitialAttachFailure(
+                            participantId: trimmed,
+                            generation: generation,
+                            error: error,
+                            source: "listener"
+                        )
+                    }
                     return
                 }
                 let documents = snapshot?.documents ?? []
@@ -567,6 +768,9 @@ final class CoachChatService: ObservableObject {
                     "[ChatSync] Unread monitor snapshot docs=\(documents.count) " +
                     "participant=\(trimmed) gen=\(generation) cache=\(fromCache)"
                 )
+                Task { @MainActor in
+                    self.markConversationsListenerHealthyIfCurrent(generation: generation)
+                }
                 Task {
                     await self.applyConversationsDocuments(
                         documents,
@@ -587,14 +791,222 @@ final class CoachChatService: ObservableObject {
                     "[ChatSync] Unread monitor server hydrate docs=\(serverSnap.documents.count) " +
                     "gen=\(generation)"
                 )
+                await MainActor.run {
+                    self.markConversationsListenerHealthyIfCurrent(generation: generation)
+                }
                 await self.applyConversationsDocuments(
                     serverSnap.documents,
                     viewerId: trimmed,
                     generation: generation
                 )
             } catch {
-                Self.appendProbeLog("[ChatSync] Unread monitor server hydrate FAILED: \(error)")
+                let errLine = "[ChatSync] Unread monitor server hydrate FAILED: \(error)"
+                Self.appendProbeLog(errLine)
+                await MainActor.run {
+                    self.handleConversationsInitialAttachFailure(
+                        participantId: trimmed,
+                        generation: generation,
+                        error: error,
+                        source: "serverHydrate"
+                    )
+                }
             }
+        }
+    }
+
+    #if DEBUG
+    /// After Code=7, compare users/{uid} get vs a known conversation get so we can
+    /// tell auth/App Check failures from conversations-rule mismatches.
+    private func probeFirestoreAuthVsConversations(participantId: String) async {
+        guard let db, let uid = Auth.auth().currentUser?.uid else {
+            Self.appendProbeLog("[ChatSync] probe SKIP — no db/auth")
+            return
+        }
+        do {
+            _ = try await db.collection("users").document(uid).getDocument(source: .server)
+            Self.appendProbeLog("[ChatSync] probe users/\(uid) GET ok")
+        } catch {
+            Self.appendProbeLog("[ChatSync] probe users/\(uid) GET FAILED: \(error)")
+        }
+
+        let iman = "UPJizMWxY5RrP6FPioj4ZFZPL393"
+        let convId = Self.conversationId(userId: iman, coachId: participantId)
+        do {
+            let snap = try await db.collection("conversations").document(convId)
+                .getDocument(source: .server)
+            Self.appendProbeLog(
+                "[ChatSync] probe conversations/\(convId) GET exists=\(snap.exists)"
+            )
+        } catch {
+            Self.appendProbeLog(
+                "[ChatSync] probe conversations/\(convId) GET FAILED: \(error)"
+            )
+        }
+    }
+    #endif
+
+    /// Only skip re-attach when we have a live listener that already succeeded.
+    private func shouldSkipConversationsAttach(for trimmed: String) -> Bool {
+        let listenerPresent = conversationsListenerPresentOverrideForTesting
+            ?? (conversationsListener != nil)
+        return unreadMonitorParticipantId == trimmed
+            && listenerPresent
+            && conversationsListenerHealthy
+    }
+
+    private func markConversationsListenerHealthyIfCurrent(generation: Int) {
+        guard conversationsObservationGeneration == generation else { return }
+        guard !conversationsListenerHealthy else { return }
+        conversationsListenerHealthy = true
+        conversationsAttachInFlight = false
+        conversationsRetryParticipantId = nil
+        conversationsColdLaunchRetryCount = 0
+        conversationsRetryTask?.cancel()
+        conversationsRetryTask = nil
+        let line = "[ChatSync] Unread monitor HEALTHY gen=\(generation)"
+        print(line)
+        NSLog("%@", line)
+        Self.appendProbeLog(line)
+    }
+
+    /// Initial attach / hydrate failed — do not treat as settled empty. Retry with backoff.
+    private func handleConversationsInitialAttachFailure(
+        participantId: String,
+        generation: Int,
+        error: Error,
+        source: String
+    ) {
+        guard conversationsObservationGeneration == generation else {
+            Self.appendProbeLog(
+                "[ChatSync] Unread monitor failure ignored (stale gen=\(generation) " +
+                "current=\(conversationsObservationGeneration) source=\(source))"
+            )
+            return
+        }
+        // After a successful snapshot, later stream errors keep last good data.
+        if conversationsListenerHealthy {
+            Self.appendProbeLog(
+                "[ChatSync] Unread monitor post-healthy error ignored source=\(source) " +
+                "(keeping \(conversations.count) conversations)"
+            )
+            return
+        }
+
+        conversationsListenerHealthy = false
+        conversationsAttachInFlight = false
+        removeConversationsListener()
+        conversationsRetryParticipantId = participantId
+
+        let code = (error as NSError).code
+        let line =
+            "[ChatSync] Unread monitor INITIAL FAILURE source=\(source) code=\(code) " +
+            "participant=\(participantId) — scheduling cold-launch retry " +
+            "(not treating as settled empty)"
+        print(line)
+        NSLog("%@", line)
+        Self.appendProbeLog(line)
+        scheduleColdLaunchConversationsRetry(for: participantId)
+    }
+
+    private func scheduleColdLaunchConversationsRetry(for participantId: String) {
+        conversationsRetryParticipantId = participantId
+        // Coalesce listener + hydrate failures in the same window into one pending retry.
+        if conversationsRetryTask != nil {
+            Self.appendProbeLog(
+                "[ChatSync] Unread monitor RETRY already pending participant=\(participantId)"
+            )
+            return
+        }
+        guard conversationsColdLaunchRetryCount < Self.maxColdLaunchAttachRetries else {
+            let line =
+                "[ChatSync] Unread monitor RETRY exhausted participant=\(participantId) " +
+                "attempts=\(conversationsColdLaunchRetryCount)"
+            print(line)
+            NSLog("%@", line)
+            Self.appendProbeLog(line)
+            return
+        }
+        let attempt = conversationsColdLaunchRetryCount
+        conversationsColdLaunchRetryCount += 1
+        let delay = Self.coldLaunchRetryDelaysNs[
+            min(attempt, Self.coldLaunchRetryDelaysNs.count - 1)
+        ]
+        conversationsRetryTask = Task { @MainActor [weak self] in
+            defer { self?.conversationsRetryTask = nil }
+            try? await Task.sleep(nanoseconds: delay)
+            guard let self, !Task.isCancelled else { return }
+            guard !self.conversationsListenerHealthy else { return }
+            let pending = self.conversationsRetryParticipantId ?? participantId
+            guard pending == participantId else { return }
+            let line =
+                "[ChatSync] Unread monitor RETRY attempt=\(attempt + 1)/" +
+                "\(Self.maxColdLaunchAttachRetries) participant=\(participantId) " +
+                "after \(delay / 1_000_000)ms"
+            print(line)
+            NSLog("%@", line)
+            Self.appendProbeLog(line)
+            // Force-refresh Auth ID token — cold launch Code=7 often means rules
+            // ran before the persisted user had a usable token for Firestore.
+            if let user = Auth.auth().currentUser {
+                do {
+                    _ = try await user.getIDTokenResult(forcingRefresh: true)
+                    Self.appendProbeLog("[ChatSync] Unread monitor Auth token refreshed for retry")
+                } catch {
+                    Self.appendProbeLog(
+                        "[ChatSync] Unread monitor Auth token refresh FAILED: \(error)"
+                    )
+                }
+            }
+            // Clear identity so startUnreadMonitoring does not no-op on in-flight/retry gates.
+            self.unreadMonitorParticipantId = nil
+            self.conversationsAttachInFlight = false
+            self.removeConversationsListener()
+            // Allow a fresh failure → retry cycle for this attempt.
+            self.conversationsRetryParticipantId = nil
+            self.startUnreadMonitoring(for: participantId)
+        }
+    }
+
+    /// Call when `syncUserSession` finishes so a cold-launch Code=7 attach can recover.
+    func retryConversationsMonitoringAfterSessionRestoreIfNeeded() {
+        guard !conversationsListenerHealthy else { return }
+        // Prefer an explicit failed-attach latch; also recover if an in-flight attach
+        // never settled (e.g. torn down during wipe) using Auth uid.
+        let participant = conversationsRetryParticipantId
+            ?? unreadMonitorParticipantId
+            ?? Auth.auth().currentUser?.uid
+        guard let participant, Self.isValidConversationParticipantId(participant) else { return }
+        let line =
+            "[ChatSync] Unread monitor RETRY after session restore participant=\(participant) " +
+            "healthy=\(conversationsListenerHealthy) listener=\(conversationsListener != nil) " +
+            "inFlight=\(conversationsAttachInFlight)"
+        print(line)
+        NSLog("%@", line)
+        Self.appendProbeLog(line)
+        // Drop any pending backoff — restore completion is the preferred retry signal.
+        conversationsRetryTask?.cancel()
+        conversationsRetryTask = nil
+        // Fresh budget after session restore (cold-launch window restarts here).
+        conversationsColdLaunchRetryCount = 0
+        unreadMonitorParticipantId = nil
+        conversationsAttachInFlight = false
+        removeConversationsListener()
+        let retryParticipant = participant
+        conversationsRetryParticipantId = nil
+        Task { @MainActor in
+            if let user = Auth.auth().currentUser {
+                do {
+                    _ = try await user.getIDTokenResult(forcingRefresh: true)
+                    Self.appendProbeLog(
+                        "[ChatSync] Unread monitor Auth token refreshed after session restore"
+                    )
+                } catch {
+                    Self.appendProbeLog(
+                        "[ChatSync] Unread monitor Auth token refresh FAILED after restore: \(error)"
+                    )
+                }
+            }
+            self.startUnreadMonitoring(for: retryParticipant)
         }
     }
 
@@ -654,6 +1066,7 @@ final class CoachChatService: ObservableObject {
         conversationsObservationGeneration += 1
         removeConversationsListener()
         unreadMonitorParticipantId = nil
+        conversationsListenerHealthy = false
         conversations = []
         print("[ChatSync] Conversations session gen=\(conversationsObservationGeneration)")
     }
@@ -663,15 +1076,31 @@ final class CoachChatService: ObservableObject {
         conversationsListener = nil
     }
 
+    private func cancelColdLaunchConversationsRetry() {
+        conversationsRetryTask?.cancel()
+        conversationsRetryTask = nil
+        conversationsRetryParticipantId = nil
+        conversationsColdLaunchRetryCount = 0
+        conversationsAttachInFlight = false
+    }
+
     func stopObservingConversations() {
         conversationsObservationGeneration += 1
+        cancelColdLaunchConversationsRetry()
         removeConversationsListener()
         unreadMonitorParticipantId = nil
+        conversationsListenerHealthy = false
+        conversationsAttachInFlight = false
         conversations = []
         print("[ChatSync] stopObservingConversations gen=\(conversationsObservationGeneration)")
     }
 
     func teardown() {
+        let line = "[ChatSync] teardown conversations=\(conversations.count) gen=\(conversationsObservationGeneration)"
+        print(line)
+        NSLog("%@", line)
+        Self.appendProbeLog(line)
+        cancelColdLaunchConversationsRetry()
         stopObservingMessages()
         stopObservingConversations()
         unreadCoachConversations = []

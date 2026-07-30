@@ -32,6 +32,11 @@ final class AppState: ObservableObject {
     /// True while restoring the authenticated user's cloud profile after login.
     /// RootView must wait on this so already-onboarded users never flash onboarding.
     @Published var isRestoringSession = false
+    /// False until the first `syncUserSession` finishes this process lifetime.
+    /// Closes the cold-launch window where MainTab mounts before restore starts
+    /// (auth resolved, `isRestoringSession` still false for a frame) and the
+    /// conversations listener attaches with a not-yet-accepted Firestore Auth token.
+    private(set) var hasFinishedSessionRestoreThisLaunch = false
 
     private let context: ModelContext
     private var settings: AppSettings
@@ -50,6 +55,7 @@ final class AppState: ObservableObject {
         showingSyncFitPlusUpgrade = false
         showingAICoach = false
         isRestoringSession = false
+        hasFinishedSessionRestoreThisLaunch = false
         settings.isAuthenticated = false
         try? context.save()
     }
@@ -93,6 +99,7 @@ final class AppState: ObservableObject {
 
     func endSessionRestore() {
         isRestoringSession = false
+        hasFinishedSessionRestoreThisLaunch = true
     }
 
     func completeOnboarding(with profile: UserProfile) {
