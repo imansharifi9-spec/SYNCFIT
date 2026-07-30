@@ -373,28 +373,18 @@ private struct ProgressPRRowView: View {
         )
     }
 
-    private var accent: Color { record.categoryAccent }
-
     var body: some View {
         HStack(alignment: .center, spacing: compact ? 8 : 10) {
-            // Same muscle-group palette as Workouts exercise icons.
-            ZStack {
-                RoundedRectangle(cornerRadius: compact ? 7 : 8, style: .continuous)
-                    .fill(accent.opacity(0.18))
-                Image(systemName: MuscleGroupArt.systemIcon(for: group))
-                    .font(.system(size: compact ? 10 : 12, weight: .semibold))
-                    .foregroundStyle(accent)
-            }
-            .frame(width: compact ? 28 : 32, height: compact ? 28 : 32)
-            .overlay {
-                RoundedRectangle(cornerRadius: compact ? 7 : 8, style: .continuous)
-                    .strokeBorder(accent.opacity(0.35), lineWidth: 1)
-            }
+            ExerciseThumbnailView(
+                exerciseName: record.exerciseName,
+                muscleGroup: group,
+                size: compact ? 28 : 32
+            )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(record.exerciseName)
                     .font(.system(size: compact ? 11 : 13, weight: .semibold))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                 Text(ProgressAnalytics.prSetDateLabel(record.prDate))
                     .font(.system(size: compact ? 10 : 11, weight: .medium))

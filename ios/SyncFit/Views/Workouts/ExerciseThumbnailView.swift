@@ -10,7 +10,15 @@ struct ExerciseThumbnailView: View {
     @State private var image: UIImage?
     @State private var loadFailed = false
 
-    private var cornerRadius: CGFloat { size >= 60 ? 14 : 10 }
+    /// Illustration fallback is authored at 52pt; scale to `size` for compact list rows (e.g. PRs).
+    private static let illustrationBaseSize: CGFloat = 52
+
+    private var cornerRadius: CGFloat {
+        if size >= 60 { return 14 }
+        if size < 40 { return max(6, size * 0.25) }
+        return 10
+    }
+
     private var cacheKey: String {
         ExerciseDemoGIFSessionCache.normalizedKey(exerciseName)
     }
@@ -23,6 +31,10 @@ struct ExerciseThumbnailView: View {
                 muscleGroup: muscleGroup,
                 style: .thumbnail
             )
+            .frame(width: Self.illustrationBaseSize, height: Self.illustrationBaseSize)
+            .scaleEffect(size / Self.illustrationBaseSize)
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .opacity(image == nil ? 1 : 0)
 
             if let image {
@@ -50,6 +62,7 @@ struct ExerciseThumbnailView: View {
                 ProgressView()
                     .controlSize(.mini)
                     .tint(.white.opacity(0.85))
+                    .scaleEffect(size < 40 ? 0.7 : 1)
             }
         }
         .frame(width: size, height: size)
