@@ -86,36 +86,49 @@ struct CoachProfileEditorTab: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    profilePhotoSection
+                VStack(alignment: .leading, spacing: 28) {
+                    CoachEditorGroup(title: "Profile") {
+                        profilePhotoSection
 
-                    CoachProfileSection(title: "Name") {
-                        TextField("Your name", text: profile.name)
-                            .foregroundStyle(.white)
-                    }
-
-                    specialtySection
-
-                    CoachProfileSection(title: "About") {
-                        CoachAboutEditor(text: profile.about)
-                    }
-
-                    CoachProfileSection(title: "Rate") {
-                        CoachRateField(ratePerMonth: profile.ratePerMonth)
-                    }
-
-                    availabilitySection
-
-                    if profile.wrappedValue.availability.supportsInPerson {
-                        CoachProfileSection(title: "Location") {
-                            TextField("City, State", text: profile.location)
+                        CoachProfileSection(title: "Name") {
+                            TextField("Your name", text: profile.name)
                                 .foregroundStyle(.white)
+                        }
+
+                        specialtySection
+                    }
+
+                    CoachEditorGroup(title: "About") {
+                        CoachProfileSection(title: "About") {
+                            CoachAboutEditor(text: profile.about)
                         }
                     }
 
-                    transformationSection
-                    testimonialsSection
-                    myRoutinesSection
+                    CoachEditorGroup(title: "Rate & availability") {
+                        CoachProfileSection(title: "Rate") {
+                            CoachRateField(ratePerMonth: profile.ratePerMonth)
+                        }
+
+                        availabilitySection
+
+                        if profile.wrappedValue.availability.supportsInPerson {
+                            CoachProfileSection(title: "Location") {
+                                TextField("City, State", text: profile.location)
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                    }
+
+                    CoachPaymentsSetupSection()
+
+                    CoachEditorGroup(title: "Photos & referrals") {
+                        transformationSection
+                        testimonialsSection
+                    }
+
+                    CoachEditorGroup(title: "Routines") {
+                        myRoutinesSection
+                    }
 
                     CoachSaveProfileButton()
 
@@ -126,7 +139,7 @@ struct CoachProfileEditorTab: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(CoachUIColor.footer)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
+                    .padding(.top, 4)
                 }
                 .padding(16)
                 .padding(.bottom, 24)
@@ -139,6 +152,7 @@ struct CoachProfileEditorTab: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 syncTransformationRecordsFromDisk()
+                coachService.startObservingOwnStripeStatus()
             }
             .confirmationDialog("Add transformation photo", isPresented: $showingTransformSourcePicker, titleVisibility: .visible) {
                 Button("Take photo") { showingTransformCamera = true }
@@ -181,12 +195,18 @@ struct CoachProfileEditorTab: View {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
+                    } else if let urlString = profile.wrappedValue.photoURL,
+                              let url = URL(string: urlString) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().scaledToFill()
+                            default:
+                                initialsPlaceholder
+                            }
+                        }
                     } else {
-                        Text(profile.wrappedValue.name.coachInitials)
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(CoachUIColor.card)
+                        initialsPlaceholder
                     }
                 }
                 .frame(width: 70, height: 70)
@@ -203,17 +223,46 @@ struct CoachProfileEditorTab: View {
         .onChange(of: profilePickerItem) { _, item in
             guard let item else { return }
             Task {
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    let fileName = "profile.jpg"
-                    try? CoachPhotoStorage.saveJPEG(from: image, fileName: fileName, coachID: profile.wrappedValue.id)
+                do {
+                    guard let data = try await item.loadTransferable(type: Data.self),
+                          let image = UIImage(data: data) else {
+                        print("[CoachPhoto] Picker produced no image data")
+                        return
+                    }
+                    guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
+                        print("[CoachPhoto] Upload skipped — not signed in")
+                        return
+                    }
+
+                    let fileName = CoachPhotoStorage.profileFileName
+                    let coachID = profile.wrappedValue.id
+                    try CoachPhotoStorage.saveJPEG(from: image, fileName: fileName, coachID: coachID)
+                    let downloadURL = try await CoachPhotoStorage.uploadProfilePhoto(
+                        image: image,
+                        coachAuthUID: uid
+                    )
+
                     await MainActor.run {
                         coachService.portalProfile.photoFileName = fileName
+                        coachService.portalProfile.photoURL = downloadURL
                         profilePickerItem = nil
                     }
+                    try await coachService.uploadPortalProfileToCloud()
+                    print("[CoachPhoto] Profile photo saved + synced photoURL")
+                } catch {
+                    print("[CoachPhoto] Profile photo save FAILED: \(error)")
+                    await MainActor.run { profilePickerItem = nil }
                 }
             }
         }
+    }
+
+    private var initialsPlaceholder: some View {
+        Text(profile.wrappedValue.name.coachInitials)
+            .font(.system(size: 24, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(CoachUIColor.card)
     }
 
     private var specialtySection: some View {
@@ -372,7 +421,11 @@ struct CoachProfileEditorTab: View {
                 .foregroundStyle(CoachUIColor.accent)
                 .padding(14)
                 .background(CoachUIColor.card)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous)
+                        .strokeBorder(CoachUIColor.border, lineWidth: 0.5)
+                )
             }
         }
     }
@@ -393,6 +446,120 @@ struct CoachProfileEditorTab: View {
             coachService.portalProfile.specialties.remove(at: index)
         } else {
             coachService.portalProfile.specialties.append(specialty)
+        }
+    }
+}
+
+/// Coach-only payments onboarding. Lives on the Profile editor tab (own profile),
+/// never on the client-facing marketplace coach screen.
+private struct CoachPaymentsSetupSection: View {
+    @EnvironmentObject private var coachService: CoachService
+
+    /// Complete banner when Firestore says charges are on, or local onboarding
+    /// state already flipped to `.complete` after a listener/server refresh.
+    private var chargesEnabled: Bool {
+        coachService.ownStripeStatus.chargesEnabled
+            || coachService.stripeOnboardingState == .complete
+    }
+
+    private var buttonTitle: String {
+        if coachService.ownStripeStatus.hasConnectedAccount {
+            return "Finish setting up payments"
+        }
+        return "Set Up Payments"
+    }
+
+    private var isBusy: Bool {
+        switch coachService.stripeOnboardingState {
+        case .creatingLink, .authenticating, .waitingForWebhook:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var body: some View {
+        CoachEditorGroup(title: "Payments") {
+            if chargesEnabled {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(CoachUIColor.accent)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Payments setup complete")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text("Clients can hire you through SyncFit Checkout.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(CoachUIColor.muted)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(14)
+                .background(CoachUIColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous)
+                        .strokeBorder(CoachUIColor.border, lineWidth: 0.5)
+                )
+                .accessibilityIdentifier("coachPaymentsCompleteBanner")
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Connect Stripe to receive client payments.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(CoachUIColor.muted)
+
+                    if case .waitingForWebhook = coachService.stripeOnboardingState {
+                        Text("Confirming payment setup…")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CoachUIColor.accent)
+                    } else if case .failed(let message) = coachService.stripeOnboardingState {
+                        Text(message)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CoachUIColor.errorRed)
+                    } else if case .canceled = coachService.stripeOnboardingState {
+                        Text("Setup was canceled. Tap below to continue.")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(CoachUIColor.muted)
+                    }
+
+                    Button {
+                        Task { await coachService.beginStripeConnectOnboarding() }
+                    } label: {
+                        HStack {
+                            if isBusy {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.black)
+                            }
+                            Text(isBusy && coachService.stripeOnboardingState == .waitingForWebhook
+                                  ? "Waiting for Stripe…"
+                                  : buttonTitle)
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .foregroundStyle(.black)
+                        .background(CoachUIColor.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    // Only block while the callable is in flight. Allow retap during
+                    // authenticating / waitingForWebhook so a stuck or expired session
+                    // can be superseded with a fresh Account Link.
+                    .disabled(coachService.stripeOnboardingState == .creatingLink)
+                    .accessibilityIdentifier("coachSetUpPaymentsButton")
+                }
+            }
+        }
+        .onAppear {
+            let uid = Auth.auth().currentUser?.uid ?? "nil"
+            let status = coachService.ownStripeStatus
+            let line =
+                "[StripeConnect] PaymentsUI appear uid=\(uid) rawChargesEnabled=\(status.chargesEnabled) hasConnectedAccount=\(status.hasConnectedAccount) onboarding=\(coachService.stripeOnboardingState) uiChargesEnabled=\(chargesEnabled)"
+            print(line)
+            NSLog("%@", line)
+            coachService.startObservingOwnStripeStatus()
+            Task { await coachService.refreshOwnStripeStatusFromServer() }
         }
     }
 }
@@ -451,14 +618,11 @@ private struct CoachClientConnectionCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(CoachUIColor.accent.opacity(0.25))
-                .frame(width: 40, height: 40)
-                .overlay {
-                    Text(displayName.coachInitials)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                }
+            ClientProfileAvatarView(
+                clientUserID: connection.clientUserID,
+                size: 40,
+                subscribeToUpdates: true
+            )
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(displayName)
@@ -559,9 +723,7 @@ struct CoachMessagesTab: View {
 
                                 if !coachParticipantId.isEmpty,
                                    conversation.isUnread(for: coachParticipantId) {
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 8, height: 8)
+                                    UnreadDotBadge(size: 8, offset: .zero)
                                         .padding(.top, 4)
                                 }
                             }

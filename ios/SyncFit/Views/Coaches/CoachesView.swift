@@ -6,6 +6,7 @@ struct CoachesView: View {
     @EnvironmentObject private var dataStore: FitnessDataStore
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var coachService: CoachService
+    @EnvironmentObject private var chatService: CoachChatService
 
     @State private var searchText = ""
     @State private var showingCoachLogin = false
@@ -35,6 +36,7 @@ struct CoachesView: View {
                     specialties: coach.specialties.isEmpty ? existing.specialties : coach.specialties,
                     reviews: coach.reviews.isEmpty ? existing.reviews : coach.reviews,
                     photoFileName: coach.photoFileName ?? existing.photoFileName,
+                    photoURL: coach.photoURL ?? existing.photoURL,
                     transformationPhotoFileNames: coach.transformationPhotoFileNames.isEmpty
                         ? existing.transformationPhotoFileNames
                         : coach.transformationPhotoFileNames,
@@ -43,7 +45,12 @@ struct CoachesView: View {
                     coachUserID: coach.coachUserID ?? existing.coachUserID,
                     stripeChargesEnabled: coach.stripeChargesEnabled
                 )
-            } else if !merged.contains(where: { $0.name == coach.name }) {
+            } else if !merged.contains(where: {
+                $0.id == coach.id
+                    || ($0.coachUserID != nil && $0.coachUserID == coach.coachUserID)
+            }) {
+                // Prefer UID/id match — never drop a real listing just because a
+                // local mock coach shares the same display name.
                 merged.append(coach)
             }
         }
@@ -164,6 +171,7 @@ struct CoachesView: View {
                 MyCoachTabCard(
                     coach: item.coach,
                     connection: item.connection,
+                    hasUnreadMessage: chatService.hasUnreadMessage(fromCoachId: item.coach.coachFirestoreID),
                     onMessage: { openChat(with: item.coach) },
                     onManage: {
                         manageSharingCoachId = item.coach.id
@@ -200,9 +208,9 @@ struct CoachesView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(CoachUIColor.card)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous)
                 .strokeBorder(CoachUIColor.border, lineWidth: 0.5)
         )
     }
@@ -324,6 +332,7 @@ struct CoachesView: View {
 private struct MyCoachTabCard: View {
     let coach: CoachProfile
     let connection: CoachClientConnection
+    var hasUnreadMessage: Bool = false
     var onMessage: () -> Void
     var onManage: () -> Void
     var onOpenProfile: () -> Void
@@ -358,13 +367,18 @@ private struct MyCoachTabCard: View {
 
             VStack(alignment: .trailing, spacing: 6) {
                 Button(action: onMessage) {
-                    Text("Message →")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(CoachUIColor.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color(red: 26 / 255, green: 58 / 255, blue: 26 / 255))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    HStack(spacing: 5) {
+                        Text("Message →")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(CoachUIColor.accent)
+                        if hasUnreadMessage {
+                            UnreadDotBadge(size: 8, offset: .zero)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color(red: 26 / 255, green: 58 / 255, blue: 26 / 255))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
 
@@ -421,23 +435,29 @@ struct CoachMarketplaceCard: View {
 
                     Spacer()
 
-                    HStack(spacing: 2) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.yellow)
-                        Text(String(format: "%.1f", coach.rating))
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.white)
+                    if coach.reviewCount >= 1 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.yellow)
+                            Text(String(format: "%.1f", coach.rating))
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                    } else {
+                        Text("No reviews yet")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(CoachUIColor.muted)
                     }
                 }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 11)
-        .background(Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(CoachUIColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous)
                 .strokeBorder(CoachUIColor.border, lineWidth: 0.5)
         )
     }
@@ -446,6 +466,8 @@ struct CoachMarketplaceCard: View {
 struct CoachAvatarView: View {
     let coach: CoachProfile
     var size: CGFloat = 40
+
+    @State private var resolvedImage: UIImage?
 
     private var backgroundColor: Color {
         switch coach.specialty.lowercased() {
@@ -458,9 +480,8 @@ struct CoachAvatarView: View {
 
     var body: some View {
         Group {
-            if let fileName = coach.photoFileName,
-               let image = CoachPhotoStorage.loadImage(fileName: fileName, coachID: coach.id) {
-                Image(uiImage: image)
+            if let resolvedImage {
+                Image(uiImage: resolvedImage)
                     .resizable()
                     .scaledToFill()
             } else {
@@ -473,6 +494,13 @@ struct CoachAvatarView: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
+        .task(id: "\(coach.id.uuidString)|\(coach.photoURL ?? "")|\(coach.photoFileName ?? "")") {
+            resolvedImage = await CoachPhotoStorage.loadProfileImage(
+                coachID: coach.id,
+                fileName: coach.photoFileName,
+                photoURL: coach.photoURL
+            )
+        }
     }
 }
 

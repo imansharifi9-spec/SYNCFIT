@@ -21,6 +21,46 @@ enum CoachUIColor {
     static let verified = Color(red: CoachStyle.verifiedBlue.red, green: CoachStyle.verifiedBlue.green, blue: CoachStyle.verifiedBlue.blue)
     static let aiBackground = Color(red: CoachStyle.aiCardBackground.red, green: CoachStyle.aiCardBackground.green, blue: CoachStyle.aiCardBackground.blue)
     static let aiBorder = Color(red: CoachStyle.aiCardBorder.red, green: CoachStyle.aiCardBorder.green, blue: CoachStyle.aiCardBorder.blue)
+
+    /// Matches Progress / marketplace cards (12pt continuous).
+    static let cardCornerRadius: CGFloat = 12
+}
+
+/// Shared card chrome used across coach screens (same tokens as Progress cards).
+struct CoachPageCard<Content: View>: View {
+    var padding: CGFloat = 12
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(CoachUIColor.card)
+            .clipShape(RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous)
+                    .strokeBorder(CoachUIColor.border, lineWidth: 0.5)
+            )
+    }
+}
+
+/// Edit-profile section group: muted header + related fields (Settings-style grouping).
+struct CoachEditorGroup<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(CoachUIColor.section)
+                .tracking(0.6)
+
+            VStack(alignment: .leading, spacing: 14) {
+                content()
+            }
+        }
+    }
 }
 
 struct CoachFlowLayout: Layout {

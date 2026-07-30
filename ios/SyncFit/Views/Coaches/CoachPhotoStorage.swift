@@ -1,6 +1,8 @@
 import Foundation
 import UIKit
 import SwiftUI
+import FirebaseAuth
+import FirebaseStorage
 
 struct CoachTransformationPhotoRecord: Codable, Identifiable, Equatable {
     let id: UUID
@@ -15,6 +17,8 @@ struct CoachTransformationPhotoRecord: Codable, Identifiable, Equatable {
 }
 
 enum CoachPhotoStorage {
+    static let profileFileName = "profile.jpg"
+
     static func directory(for coachID: UUID) -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = base
@@ -76,7 +80,11 @@ enum CoachPhotoStorage {
     }
 
     static func saveJPEG(from image: UIImage, fileName: String, coachID: UUID) throws {
-        guard let data = image.jpegData(compressionQuality: 0.85) else { return }
+        guard let data = image.jpegData(compressionQuality: 0.85) else {
+            throw NSError(domain: "CoachPhotoStorage", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "Could not encode profile JPEG."
+            ])
+        }
         let url = directory(for: coachID).appendingPathComponent(fileName)
         try data.write(to: url, options: .atomic)
     }
@@ -90,6 +98,65 @@ enum CoachPhotoStorage {
     static func delete(fileName: String, coachID: UUID) {
         let url = directory(for: coachID).appendingPathComponent(fileName)
         try? FileManager.default.removeItem(at: url)
+    }
+
+    /// Storage object path for the coach marketplace headshot.
+    static func profileStoragePath(coachAuthUID: String) -> String {
+        "coaches/\(coachAuthUID)/\(profileFileName)"
+    }
+
+    /// Uploads profile JPEG to Firebase Storage and returns a download URL.
+    static func uploadProfilePhoto(image: UIImage, coachAuthUID: String) async throws -> String {
+        guard FirebaseConfiguration.isConfigured else {
+            throw NSError(domain: "CoachPhotoStorage", code: 3, userInfo: [
+                NSLocalizedDescriptionKey: "Firebase is not configured."
+            ])
+        }
+        guard let data = image.jpegData(compressionQuality: 0.85) else {
+            throw NSError(domain: "CoachPhotoStorage", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "Could not encode profile JPEG."
+            ])
+        }
+
+        let path = profileStoragePath(coachAuthUID: coachAuthUID)
+        let ref = Storage.storage().reference().child(path)
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
+
+        print("[CoachPhoto] Storage upload START \(path) bytes=\(data.count)")
+        do {
+            _ = try await ref.putDataAsync(data, metadata: metadata)
+            let url = try await ref.downloadURL()
+            print("[CoachPhoto] Storage upload OK \(path)")
+            return url.absoluteString
+        } catch {
+            print("[CoachPhoto] Storage upload FAILED \(path): \(error)")
+            throw error
+        }
+    }
+
+    /// Local cache first, then downloadURL. Caches remotely loaded bytes under coachID.
+    static func loadProfileImage(
+        coachID: UUID,
+        fileName: String?,
+        photoURL: String?
+    ) async -> UIImage? {
+        let resolvedName = (fileName?.isEmpty == false) ? fileName! : profileFileName
+        if let local = loadImage(fileName: resolvedName, coachID: coachID) {
+            return local
+        }
+        guard let photoURL, let url = URL(string: photoURL), !photoURL.isEmpty else {
+            return nil
+        }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard let image = UIImage(data: data) else { return nil }
+            try? saveJPEG(from: image, fileName: resolvedName, coachID: coachID)
+            return image
+        } catch {
+            print("[CoachPhoto] Remote load FAILED \(photoURL): \(error)")
+            return nil
+        }
     }
 }
 

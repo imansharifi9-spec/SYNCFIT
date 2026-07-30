@@ -135,15 +135,23 @@ struct CoachProfileScreen: View {
     }
 
     private var ratingRow: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "star.fill")
-                .foregroundStyle(.yellow)
-            Text(String(format: "%.1f", coach.rating))
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-            Text("· \(coach.reviewCount) reviews")
-                .font(.system(size: 12))
-                .foregroundStyle(CoachUIColor.muted)
+        Group {
+            if coach.reviewCount >= 1 {
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(.yellow)
+                    Text(String(format: "%.1f", coach.rating))
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("· \(coach.reviewCount) review\(coach.reviewCount == 1 ? "" : "s")")
+                        .font(.system(size: 12))
+                        .foregroundStyle(CoachUIColor.muted)
+                }
+            } else {
+                Text("No reviews yet")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(CoachUIColor.muted)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }
@@ -153,12 +161,14 @@ struct CoachProfileScreen: View {
             Text("About")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
-            Text(coach.bio)
-                .font(.system(size: 12))
-                .foregroundStyle(CoachUIColor.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineLimit(nil)
-                .multilineTextAlignment(.leading)
+            CoachPageCard {
+                Text(coach.bio)
+                    .font(.system(size: 12))
+                    .foregroundStyle(CoachUIColor.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(nil)
+                    .multilineTextAlignment(.leading)
+            }
         }
     }
 
@@ -167,16 +177,18 @@ struct CoachProfileScreen: View {
             Text("Specialties")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
-            CoachFlowLayout(spacing: 8) {
-                ForEach(coach.specialties, id: \.self) { specialty in
-                    Text(specialty)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(CoachUIColor.muted)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(CoachUIColor.card)
-                        .clipShape(Capsule())
-                        .overlay(Capsule().strokeBorder(CoachUIColor.border, lineWidth: 0.5))
+            CoachPageCard {
+                CoachFlowLayout(spacing: 8) {
+                    ForEach(coach.specialties, id: \.self) { specialty in
+                        Text(specialty)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(CoachUIColor.muted)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(CoachUIColor.chipInactiveBackground)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().strokeBorder(CoachUIColor.border, lineWidth: 0.5))
+                    }
                 }
             }
         }
@@ -188,21 +200,23 @@ struct CoachProfileScreen: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
 
-            if coach.transformationPhotoFileNames.isEmpty {
-                Text("No transformation photos yet.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(CoachUIColor.muted)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(coach.transformationPhotoFileNames, id: \.self) { fileName in
-                            if let image = CoachPhotoStorage.loadTransformationImage(fileName: fileName, coachID: coach.id)
-                                ?? CoachPhotoStorage.loadImage(fileName: fileName, coachID: coach.id) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 120, height: 150)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            CoachPageCard {
+                if coach.transformationPhotoFileNames.isEmpty {
+                    Text("No transformation photos yet.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(CoachUIColor.muted)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(coach.transformationPhotoFileNames, id: \.self) { fileName in
+                                if let image = CoachPhotoStorage.loadTransformationImage(fileName: fileName, coachID: coach.id)
+                                    ?? CoachPhotoStorage.loadImage(fileName: fileName, coachID: coach.id) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 120, height: 150)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                }
                             }
                         }
                     }
@@ -212,13 +226,15 @@ struct CoachProfileScreen: View {
     }
 
     private var priceSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("$\(coach.pricePerMonth)/month")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(CoachUIColor.accent)
-            Text(coach.availabilityBadge + (coach.location.isEmpty ? "" : " · \(coach.location)"))
-                .font(.system(size: 11))
-                .foregroundStyle(CoachUIColor.muted)
+        CoachPageCard {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("$\(coach.pricePerMonth)/month")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(CoachUIColor.accent)
+                Text(coach.availabilityBadge + (coach.location.isEmpty ? "" : " · \(coach.location)"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(CoachUIColor.muted)
+            }
         }
     }
 
@@ -237,23 +253,22 @@ struct CoachProfileScreen: View {
             }
 
             ForEach(coach.reviews.prefix(3)) { review in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(review.clientName)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white)
-                        Spacer()
-                        Text(String(format: "%.1f", review.rating))
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.yellow)
+                CoachPageCard(padding: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(review.clientName)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Text(String(format: "%.1f", review.rating))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.yellow)
+                        }
+                        Text(review.text)
+                            .font(.system(size: 11))
+                            .foregroundStyle(CoachUIColor.muted)
                     }
-                    Text(review.text)
-                        .font(.system(size: 11))
-                        .foregroundStyle(CoachUIColor.muted)
                 }
-                .padding(10)
-                .background(CoachUIColor.card)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
     }

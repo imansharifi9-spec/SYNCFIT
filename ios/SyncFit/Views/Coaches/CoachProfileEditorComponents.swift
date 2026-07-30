@@ -17,14 +17,9 @@ struct CoachProfileSection<Content: View>: View {
                     .foregroundStyle(CoachUIColor.subtitle)
             }
 
-            content()
-                .padding(12)
-                .background(CoachUIColor.card)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(CoachUIColor.border, lineWidth: 0.5)
-                )
+            CoachPageCard {
+                content()
+            }
         }
     }
 }
@@ -247,9 +242,9 @@ struct CoachTestimonialCard: View {
         }
         .padding(12)
         .background(CoachUIColor.testimonialCard)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous)
                 .strokeBorder(CoachUIColor.border, lineWidth: 0.5)
         )
     }
