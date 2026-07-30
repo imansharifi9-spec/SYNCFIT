@@ -2,6 +2,22 @@ import Foundation
 import SwiftData
 import UIKit
 
+enum FoodLogError: LocalizedError {
+    case cloudUnavailable
+    case cloudWriteFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .cloudUnavailable:
+            return "Couldn't sync to the cloud. Check your connection and try again."
+        case .cloudWriteFailed(let detail):
+            return detail.isEmpty
+                ? "Couldn't save food to the cloud. Try again."
+                : detail
+        }
+    }
+}
+
 @MainActor
 final class FitnessDataStore: ObservableObject {
     @Published private(set) var workouts: [WorkoutEntry] = []
@@ -94,6 +110,12 @@ final class FitnessDataStore: ObservableObject {
         return latest.weight - earliest.weight
     }
 
+    /// Change vs the previous logged weight entry (lbs). Nil with fewer than 2 entries.
+    func latestWeightDeltaLbs() -> Double? {
+        guard weights.count >= 2 else { return nil }
+        return weights[0].weight - weights[1].weight
+    }
+
     var todaysWorkouts: [WorkoutEntry] {
         workouts(on: .now)
     }
@@ -115,6 +137,54 @@ final class FitnessDataStore: ObservableObject {
         }
         persistSessionLabels()
         objectWillChange.send()
+    }
+
+    /// True when at least one workout entry on this day has completed/logged sets.
+    func hasLoggedWorkoutHistory(on date: Date, calendar: Calendar = .current) -> Bool {
+        workouts(on: date, calendar: calendar).contains { !$0.sets.isEmpty }
+    }
+
+    /// Freeze the training-session title shown for a day that already has logged work.
+    /// Prefer an existing session label; otherwise snapshot the current schedule/routine title.
+    func freezeSessionLabelForLoggedDayIfNeeded(on date: Date) {
+        guard hasLoggedWorkoutHistory(on: date) else { return }
+        let key = Self.dayKey(for: date)
+        if let existing = sessionLabelsByDay[key], !existing.isEmpty {
+            return
+        }
+        let snapshot =
+            routineTypeLabel(for: date)
+            ?? scheduledTitle(for: date)
+            ?? routine(for: date)?.name
+        guard let snapshot, !snapshot.isEmpty else { return }
+        sessionLabelsByDay[key] = snapshot
+        persistSessionLabels()
+        objectWillChange.send()
+    }
+
+    /// Session labels for dates that already have logged history must survive schedule replaces.
+    private func preservedSessionLabelsForLoggedDays() -> [String: String] {
+        var preserved: [String: String] = [:]
+        let calendar = Calendar.current
+        var dayStarts = Set<Date>()
+        for entry in workouts where !entry.sets.isEmpty {
+            dayStarts.insert(calendar.startOfDay(for: entry.date))
+        }
+        for dayStart in dayStarts {
+            let key = Self.dayKey(for: dayStart)
+            if let existing = sessionLabelsByDay[key], !existing.isEmpty {
+                preserved[key] = existing
+                continue
+            }
+            let snapshot =
+                routineTypeLabel(for: dayStart)
+                ?? scheduledTitle(for: dayStart)
+                ?? routine(for: dayStart)?.name
+            if let snapshot, !snapshot.isEmpty {
+                preserved[key] = snapshot
+            }
+        }
+        return preserved
     }
 
     func displaySessionName(for date: Date) -> String? {
@@ -186,23 +256,6 @@ final class FitnessDataStore: ObservableObject {
         scheduledRoutine(for: date)
     }
 
-
-    /// True when at least one workout entry on this day has completed/logged sets.
-    func hasLoggedWorkoutHistory(on date: Date, calendar: Calendar = .current) -> Bool {
-        workouts(on: date, calendar: calendar).contains { !$0.sets.isEmpty }
-    }
-
-    /// Shared day title for Home + Workouts: frozen session label when the day was trained,
-    /// otherwise the current schedule/routine display name.
-    func workoutDayDisplayTitle(for date: Date) -> String {
-        if hasLoggedWorkoutHistory(on: date),
-           let label = sessionLabel(for: date),
-           !label.isEmpty {
-            return label
-        }
-        return routineDisplayName(for: date)
-    }
-
     func routineDisplayName(for date: Date) -> String {
         if let routine = routine(for: date) {
             return routine.name
@@ -217,6 +270,17 @@ final class FitnessDataStore: ObservableObject {
             let title = assignment.displayTitle(matching: routines)
             return title == "—" ? "No workout scheduled" : title
         }
+    }
+
+    /// Shared day title for Home + Workouts: frozen session label when the day was trained,
+    /// otherwise the current schedule/routine display name.
+    func workoutDayDisplayTitle(for date: Date) -> String {
+        if hasLoggedWorkoutHistory(on: date),
+           let label = sessionLabel(for: date),
+           !label.isEmpty {
+            return label
+        }
+        return routineDisplayName(for: date)
     }
 
     /// True when today has a concrete scheduled routine (or logged plan), not just an empty placeholder day.
@@ -385,6 +449,7 @@ final class FitnessDataStore: ObservableObject {
     }
 
     func markWorkoutCompleted(for date: Date) {
+        freezeSessionLabelForLoggedDayIfNeeded(on: date)
         completedWorkoutDays.insert(Self.dayKey(for: date))
         persistCompletedWorkoutDays()
         objectWillChange.send()
@@ -924,6 +989,18 @@ final class FitnessDataStore: ObservableObject {
             print("[WorkoutSync] PART2 FAILED silently risk — routine \(routine.id.uuidString) has ZERO exercises; schedule slot will show Custom with empty day")
         }
 
+        // Completed/logged days keep their history intact — never append a new schedule's plan rows.
+        if hasLoggedWorkoutHistory(on: dayStart) {
+            clearNonManualWorkouts(on: dayStart) // drop stray empty plan rows only
+            print(
+                "[WorkoutSync] PART2 skipped plan insert — date=\(Self.dayKey(for: dayStart)) " +
+                "already has logged workout history"
+            )
+            applySessionLabelForDayPlan(sessionLabel ?? routine.name, on: date)
+            syncDayWorkoutIfNeeded(on: dayStart)
+            return
+        }
+
         clearNonManualWorkouts(on: dayStart)
 
         let entries = routine.sortedExercises.map { item in
@@ -954,18 +1031,34 @@ final class FitnessDataStore: ObservableObject {
             print("[WorkoutSync] PART2 no day rows — routine content empty date=\(Self.dayKey(for: dayStart)) routineID=\(routine.id.uuidString)")
         }
 
-        setSessionLabel(sessionLabel ?? routine.name, for: date)
+        applySessionLabelForDayPlan(sessionLabel ?? routine.name, on: date)
         syncDayWorkoutIfNeeded(on: dayStart)
+    }
+
+    /// Updates the day plan projection without overwriting a frozen title for logged/completed days.
+    private func applySessionLabelForDayPlan(_ label: String, on date: Date) {
+        // Logged/completed days keep their frozen title; never stamp the new plan name onto them.
+        if hasLoggedWorkoutHistory(on: date) {
+            return
+        }
+        setSessionLabel(label, for: date)
     }
 
     private func clearNonManualWorkouts(on date: Date? = nil) {
         let calendar = Calendar.current
         let toDelete = workouts.filter { entry in
+            // Preserve any entry with completed/logged sets — never treat history as a disposable day plan.
+            guard entry.sets.isEmpty else { return false }
             guard !isManualWorkoutEntry(entry) else { return false }
             guard let date else { return true }
             return calendar.isDate(entry.date, inSameDayAs: date)
         }
         guard !toDelete.isEmpty else { return }
+
+        print(
+            "[WorkoutSync] clearNonManualWorkouts deleting \(toDelete.count) empty planned row(s); " +
+            "preserving \(workouts.filter { !$0.sets.isEmpty }.count) logged-history entr(y/ies)"
+        )
 
         for entry in toDelete {
             let targetID = entry.id
@@ -975,6 +1068,7 @@ final class FitnessDataStore: ObservableObject {
             if let record = try? context.fetch(descriptor).first {
                 context.delete(record)
             }
+            // Firestore deletes only for rows that passed the empty-sets guard above.
             syncToFirestoreIfNeeded(label: "deleteWorkout.clearDayPlan") {
                 try await $0.deleteWorkout(entry)
             }
@@ -1547,11 +1641,28 @@ final class FitnessDataStore: ObservableObject {
 
     private func persistSessionLabels() {
         guard let data = try? JSONEncoder().encode(sessionLabelsByDay),
-              let json = String(data: data, encoding: .utf8) else { return }
-        let descriptor = FetchDescriptor<AppSettings>()
-        guard let settings = try? context.fetch(descriptor).first else { return }
+              let json = String(data: data, encoding: .utf8),
+              let settings = ensureAppSettings() else { return }
         settings.sessionLabelsJSON = json
         try? context.save()
+    }
+
+    /// Ensures an AppSettings row exists so label/schedule prefs can persist in tests and fresh stores.
+    @discardableResult
+    private func ensureAppSettings() -> AppSettings? {
+        let descriptor = FetchDescriptor<AppSettings>()
+        if let settings = try? context.fetch(descriptor).first {
+            return settings
+        }
+        let settings = AppSettings()
+        context.insert(settings)
+        do {
+            try context.save()
+            return settings
+        } catch {
+            print("[WorkoutSync] Failed to create AppSettings: \(error)")
+            return nil
+        }
     }
 
     private func loadDayTemplateAssignments() {
@@ -1682,8 +1793,12 @@ final class FitnessDataStore: ObservableObject {
         return protein >= target
     }
 
+    /// Mission / weekly consistency: a scheduled rest day counts as complete
+    /// (recovery honored), same as finishing a training-day workout.
     func workoutGoalMet(on date: Date, calendar: Calendar = .current) -> Bool {
-        workouts(on: date, calendar: calendar).contains { !$0.sets.isEmpty }
+        if isRestDay(for: date) { return true }
+        if workoutSessionState(for: date) == .completed { return true }
+        return workouts(on: date, calendar: calendar).contains { !$0.sets.isEmpty }
     }
 
     func weeklyProteinMissionCompletion(
@@ -1754,6 +1869,10 @@ final class FitnessDataStore: ObservableObject {
     }
 
     func plannedExerciseCount(for date: Date) -> Int {
+        // Completed/logged days: show what was actually trained, not the new schedule size.
+        if hasLoggedWorkoutHistory(on: date) {
+            return exercisesWithLoggedSetsCount(on: date)
+        }
         let planned = routineExerciseCount(for: date)
         if planned > 0 { return planned }
         return workouts(on: date).count
@@ -1849,6 +1968,45 @@ final class FitnessDataStore: ObservableObject {
         validateDayTemplateAssignments()
         seedDefaultDayTemplateAssignmentsIfNeeded()
         purgeOffCategoryExercisesForAllScheduledDays()
+        removeOrphanedPlanRowsFromLoggedDays()
+    }
+
+    /// One-time / idempotent cleanup for pre-fix merges: on any day that has real logged
+    /// sets, delete leftover empty planned rows that were appended by the old schedule switch bug.
+    private func removeOrphanedPlanRowsFromLoggedDays() {
+        let calendar = Calendar.current
+        var loggedDayStarts = Set<Date>()
+        for entry in workouts where !entry.sets.isEmpty {
+            loggedDayStarts.insert(calendar.startOfDay(for: entry.date))
+        }
+        guard !loggedDayStarts.isEmpty else { return }
+
+        let orphans = workouts.filter { entry in
+            entry.sets.isEmpty
+                && !isManualWorkoutEntry(entry)
+                && loggedDayStarts.contains(calendar.startOfDay(for: entry.date))
+        }
+        guard !orphans.isEmpty else { return }
+
+        print(
+            "[WorkoutSync] Cleaning \(orphans.count) orphaned empty plan row(s) from " +
+            "\(loggedDayStarts.count) logged day(s)"
+        )
+
+        for entry in orphans {
+            let targetID = entry.id
+            var descriptor = FetchDescriptor<WorkoutRecord>(
+                predicate: #Predicate { $0.id == targetID }
+            )
+            if let record = try? context.fetch(descriptor).first {
+                context.delete(record)
+            }
+            syncToFirestoreIfNeeded(label: "deleteWorkout.orphanPlanCleanup") {
+                try await $0.deleteWorkout(entry)
+            }
+        }
+        try? context.save()
+        workouts = fetchWorkouts()
     }
 
     private func validateDayTemplateAssignments() {
@@ -1993,7 +2151,6 @@ final class FitnessDataStore: ObservableObject {
         let preservedRestTimer = settings.restTimerSeconds
         let preservedMacroStyle = settings.nutritionMacroDisplayStyle
         let preservedHealthSync = settings.appleHealthSyncEnabled
-        let preservedSubscriber = settings.isSyncFitPlusSubscriber
 
         settings.profile = UserProfile()
         settings.hasCompletedOnboarding = false
@@ -2012,12 +2169,13 @@ final class FitnessDataStore: ObservableObject {
         settings.coachModeActive = false
         settings.userIsCoach = false
         settings.isAuthenticated = false
+        // Legacy SwiftData field — entitlement lives in SubscriptionManager / StoreKit only.
+        settings.isSyncFitPlusSubscriber = false
 
         settings.appearance = preservedAppearance
         settings.restTimerSeconds = preservedRestTimer
         settings.nutritionMacroDisplayStyle = preservedMacroStyle
         settings.appleHealthSyncEnabled = preservedHealthSync
-        settings.isSyncFitPlusSubscriber = preservedSubscriber
 
         try? context.save()
     }
@@ -2068,6 +2226,9 @@ final class FitnessDataStore: ObservableObject {
         if mergeIntoExistingWorkout(normalized) {
             markWorkoutInProgress(for: normalized.date)
             saveAndReload()
+            if !normalized.sets.isEmpty {
+                freezeSessionLabelForLoggedDayIfNeeded(on: normalized.date)
+            }
             syncDayWorkoutIfNeeded(on: normalized.date)
             return
         }
@@ -2075,6 +2236,9 @@ final class FitnessDataStore: ObservableObject {
         context.insert(WorkoutRecord(from: normalized))
         markWorkoutInProgress(for: normalized.date)
         saveAndReload()
+        if !normalized.sets.isEmpty {
+            freezeSessionLabelForLoggedDayIfNeeded(on: normalized.date)
+        }
         syncDayWorkoutIfNeeded(on: normalized.date)
         syncToFirestoreIfNeeded(label: "saveWorkout.add") { try await $0.saveWorkout(normalized) }
     }
@@ -2295,6 +2459,46 @@ final class FitnessDataStore: ObservableObject {
         syncToFirestoreIfNeeded { try await $0.saveMeal(normalized) }
     }
 
+    /// Persists food locally and awaits a confirmed Firestore write.
+    /// On cloud failure, rolls back the local insert so the nutrition log
+    /// never shows an entry that did not sync.
+    func addFoodAwaitingCloud(_ entry: FoodEntry) async throws {
+        var normalized = entry
+        normalized.date = Calendar.current.startOfDay(for: entry.date)
+
+        guard let firestore else {
+            throw FoodLogError.cloudUnavailable
+        }
+
+        context.insert(FoodRecord(from: normalized))
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
+        reload()
+
+        do {
+            try await firestore.saveMeal(normalized)
+        } catch {
+            removeLocalFood(id: normalized.id)
+            throw FoodLogError.cloudWriteFailed(error.localizedDescription)
+        }
+
+        syncToHealthIfNeeded { await $0.syncFood(normalized) }
+    }
+
+    private func removeLocalFood(id: UUID) {
+        var descriptor = FetchDescriptor<FoodRecord>(
+            predicate: #Predicate { $0.id == id }
+        )
+        guard let record = try? context.fetch(descriptor).first else { return }
+        context.delete(record)
+        try? context.save()
+        reload()
+    }
+
     func updateFood(_ entry: FoodEntry) {
         let targetID = entry.id
         var descriptor = FetchDescriptor<FoodRecord>(
@@ -2376,6 +2580,23 @@ final class FitnessDataStore: ObservableObject {
             date: Calendar.current.startOfDay(for: date)
         )
         addFood(entry)
+    }
+
+    func logSavedMealAwaitingCloud(
+        _ meal: SavedMeal,
+        as mealType: MealType,
+        on date: Date = .now
+    ) async throws {
+        let entry = FoodEntry(
+            name: meal.name,
+            calories: meal.totalCalories,
+            protein: meal.totalProtein,
+            carbs: meal.totalCarbs,
+            fat: meal.totalFat,
+            meal: mealType,
+            date: Calendar.current.startOfDay(for: date)
+        )
+        try await addFoodAwaitingCloud(entry)
     }
 
     func addRoutine(_ routine: WorkoutRoutine) {
@@ -2491,9 +2712,12 @@ final class FitnessDataStore: ObservableObject {
             for routine in routines {
                 deleteRoutine(routine)
             }
+            // Snapshot labels for days with real logged work BEFORE clearing plans/labels.
+            let preservedLoggedDayLabels = preservedSessionLabelsForLoggedDays()
             clearNonManualWorkouts()
             activeDayTemplateKinds.removeAll()
             sessionLabelsByDay.removeAll()
+            sessionLabelsByDay.merge(preservedLoggedDayLabels) { _, new in new }
             persistActiveDayTemplateKinds()
             persistSessionLabels()
             updateWeekSchedule(.blank)
@@ -2649,15 +2873,20 @@ final class FitnessDataStore: ObservableObject {
     }
 
     func progressPhotos(for userId: String? = nil) -> [ProgressPhotoEntry] {
-        let resolvedUserId = userId ?? ProgressPhotoStorage.localUserId
-        return progressPhotos.filter { $0.userId == resolvedUserId }
+        let resolvedUserId = userId ?? ProgressPhotoStorage.currentUserId
+        // Include legacy "local" photos so older saves still appear for the signed-in user.
+        return progressPhotos.filter {
+            $0.userId == resolvedUserId
+                || ($0.userId == ProgressPhotoStorage.localUserId
+                    && resolvedUserId != ProgressPhotoStorage.localUserId)
+        }
     }
 
     func addProgressPhoto(_ image: UIImage, date: Date = .now, userId: String? = nil) throws {
-        let resolvedUserId = userId ?? ProgressPhotoStorage.localUserId
+        let resolvedUserId = userId ?? ProgressPhotoStorage.currentUserId
         let id = UUID()
         let fileName = try ProgressPhotoStorage.saveJPEG(from: image, id: id, userId: resolvedUserId)
-        let entry = ProgressPhotoEntry(
+        var entry = ProgressPhotoEntry(
             id: id,
             date: Calendar.current.startOfDay(for: date),
             fileName: fileName,
@@ -2665,6 +2894,27 @@ final class FitnessDataStore: ObservableObject {
         )
         context.insert(ProgressPhotoRecord(from: entry))
         saveAndReload()
+        print("[ProgressPhoto] Local save OK id=\(id.uuidString) userId=\(resolvedUserId) file=\(fileName)")
+
+        // Cloud sync: Storage upload + Firestore metadata (best-effort; local already saved).
+        syncToFirestoreIfNeeded(label: "progressPhoto.upload") { firestore in
+            do {
+                let remote = try await ProgressPhotoStorage.uploadToFirebaseStorage(
+                    image: image,
+                    userId: resolvedUserId,
+                    fileName: fileName
+                )
+                entry.downloadURL = remote.downloadURL
+                entry.storagePath = remote.storagePath
+                try await firestore.saveProgressPhotoMetadata(entry)
+                await MainActor.run {
+                    self.upsertProgressPhotoRemoteFields(entry)
+                }
+            } catch {
+                print("[ProgressPhoto] Cloud sync FAILED id=\(id.uuidString): \(error)")
+                throw error
+            }
+        }
     }
 
     func deleteProgressPhoto(_ entry: ProgressPhotoEntry) {
@@ -2676,8 +2926,14 @@ final class FitnessDataStore: ObservableObject {
         ProgressPhotoStorage.delete(fileName: record.fileName, userId: record.userId)
         context.delete(record)
         saveAndReload()
-    }
 
+        let storagePath = entry.storagePath
+            ?? ProgressPhotoStorage.storageObjectPath(userId: entry.userId, fileName: entry.fileName)
+        syncToFirestoreIfNeeded(label: "progressPhoto.delete") { firestore in
+            await ProgressPhotoStorage.deleteRemote(storagePath: storagePath)
+            try await firestore.deleteProgressPhotoMetadata(entry)
+        }
+    }
 
     /// Merge cloud progress-photo metadata into local SwiftData (keeps local image cache).
     func mergeCloudProgressPhotos(_ cloudPhotos: [ProgressPhotoEntry]) {
@@ -2701,6 +2957,15 @@ final class FitnessDataStore: ObservableObject {
         if changed {
             saveAndReload()
         }
+    }
+
+    private func upsertProgressPhotoRemoteFields(_ entry: ProgressPhotoEntry) {
+        // Remote URL/path live on the in-memory entry used by UI; refresh list so
+        // ProgressPhotosCard re-reads from SwiftData + any cached download.
+        if let index = progressPhotos.firstIndex(where: { $0.id == entry.id }) {
+            progressPhotos[index] = entry
+        }
+        objectWillChange.send()
     }
 
     private func saveAndReload() {

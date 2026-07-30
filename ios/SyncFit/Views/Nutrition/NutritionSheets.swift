@@ -594,6 +594,8 @@ struct ManualFoodEntrySheet: View {
 
     let logDate: Date
     var defaultMeal: MealType = .lunch
+    var onLogged: (String) -> Void
+    var onLogFailed: (String) -> Void
 
     @State private var name = ""
     @State private var calories = 0
@@ -601,11 +603,24 @@ struct ManualFoodEntrySheet: View {
     @State private var carbs = 0
     @State private var fat = 0
     @State private var meal: MealType
+    @State private var isSaving = false
+    @State private var saveError: String?
 
-    init(logDate: Date = .now, defaultMeal: MealType = .lunch) {
+    init(
+        logDate: Date = .now,
+        defaultMeal: MealType = .lunch,
+        onLogged: @escaping (String) -> Void = { _ in },
+        onLogFailed: @escaping (String) -> Void = { _ in }
+    ) {
         self.logDate = logDate
         self.defaultMeal = defaultMeal
+        self.onLogged = onLogged
+        self.onLogFailed = onLogFailed
         _meal = State(initialValue: defaultMeal)
+    }
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var body: some View {
@@ -619,29 +634,55 @@ struct ManualFoodEntrySheet: View {
                     fat: $fat,
                     meal: $meal
                 )
+
+                if let saveError {
+                    Section {
+                        Text(saveError)
+                            .font(.caption)
+                            .foregroundStyle(Color(red: 0.92, green: 0.45, blue: 0.42))
+                            .accessibilityIdentifier("manualFoodLogError")
+                    }
+                }
             }
             .navigationTitle("Manual Entry")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        let entry = FoodEntry(
-                            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                            calories: calories,
-                            protein: protein,
-                            carbs: carbs,
-                            fat: fat,
-                            meal: meal,
-                            date: Calendar.current.startOfDay(for: logDate)
-                        )
-                        dataStore.addFood(entry)
-                        dismiss()
+                    Button(isSaving ? "Logging…" : "Save") {
+                        save()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(trimmedName.isEmpty || isSaving)
                 }
+            }
+        }
+    }
+
+    private func save() {
+        saveError = nil
+        let entry = FoodEntry(
+            name: trimmedName,
+            calories: calories,
+            protein: protein,
+            carbs: carbs,
+            fat: fat,
+            meal: meal,
+            date: Calendar.current.startOfDay(for: logDate)
+        )
+        isSaving = true
+        Task { @MainActor in
+            defer { isSaving = false }
+            do {
+                try await dataStore.addFoodAwaitingCloud(entry)
+                onLogged(entry.name)
+                dismiss()
+            } catch {
+                let message = error.localizedDescription
+                saveError = message
+                onLogFailed(message)
             }
         }
     }
@@ -722,48 +763,42 @@ struct SavedMealEditorSheet: View {
     let existingMeal: SavedMeal?
 
     @State private var name: String
-    @State private var components: [MealComponent]
-    @State private var showingIngredientSearch = false
+    @State private var calories: Int
+    @State private var protein: Int
+    @State private var carbs: Int
+    @State private var fat: Int
 
     init(meal: SavedMeal? = nil) {
         self.existingMeal = meal
         _name = State(initialValue: meal?.name ?? "")
-        _components = State(initialValue: meal?.components ?? [])
+        // Totals are still persisted via a single MealComponent so logging /
+        // list display (which sum components) keep working without ingredients UI.
+        _calories = State(initialValue: meal?.totalCalories ?? 0)
+        _protein = State(initialValue: meal?.totalProtein ?? 0)
+        _carbs = State(initialValue: meal?.totalCarbs ?? 0)
+        _fat = State(initialValue: meal?.totalFat ?? 0)
     }
 
-    private var totals: SavedMeal {
-        SavedMeal(name: name, components: components)
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var canSave: Bool {
+        !trimmedName.isEmpty && calories > 0
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Meal Name") {
-                    TextField("e.g. Chicken and rice", text: $name)
-                }
-
-                Section("Ingredients") {
-                    if components.isEmpty {
-                        Text("Add ingredients from the food database.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    ForEach(components) { component in
-                        SavedMealIngredientRow(component: component)
-                    }
-                    .onDelete { components.remove(atOffsets: $0) }
-
-                    Button("Add Ingredient", systemImage: "plus") {
-                        showingIngredientSearch = true
-                    }
+                    TextField("e.g. Post-workout shake", text: $name)
                 }
 
                 Section("Meal Totals") {
-                    LabeledContent("Calories", value: "\(totals.totalCalories) cal")
-                    LabeledContent("Protein", value: "\(totals.totalProtein)g")
-                    LabeledContent("Carbs", value: "\(totals.totalCarbs)g")
-                    LabeledContent("Fat", value: "\(totals.totalFat)g")
+                    mealTotalField(title: "Calories", value: $calories, suffix: "cal")
+                    mealTotalField(title: "Protein", value: $protein, suffix: "g")
+                    mealTotalField(title: "Carbs", value: $carbs, suffix: "g")
+                    mealTotalField(title: "Fat", value: $fat, suffix: "g")
                 }
             }
             .navigationTitle(existingMeal == nil ? "Create Meal" : "Edit Meal")
@@ -773,13 +808,21 @@ struct SavedMealEditorSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !trimmedName.isEmpty, !components.isEmpty else { return }
+                        guard canSave else { return }
 
                         let meal = SavedMeal(
                             id: existingMeal?.id ?? UUID(),
                             name: trimmedName,
-                            components: components
+                            components: [
+                                MealComponent(
+                                    name: trimmedName,
+                                    amount: "",
+                                    calories: max(0, calories),
+                                    protein: max(0, protein),
+                                    carbs: max(0, carbs),
+                                    fat: max(0, fat)
+                                )
+                            ]
                         )
 
                         if existingMeal == nil {
@@ -789,41 +832,23 @@ struct SavedMealEditorSheet: View {
                         }
                         dismiss()
                     }
-                    .disabled(
-                        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || components.isEmpty
-                    )
-                }
-            }
-            .sheet(isPresented: $showingIngredientSearch) {
-                FoodSearchSheet { component in
-                    components.append(component)
+                    .disabled(!canSave)
                 }
             }
         }
     }
-}
 
-private struct SavedMealIngredientRow: View {
-    let component: MealComponent
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(component.name)
-                .font(.system(size: 13, weight: .semibold))
-            Text(ingredientDetail)
-                .font(.system(size: 11))
+    private func mealTotalField(title: String, value: Binding<Int>, suffix: String) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField("0", value: value, format: .number)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .frame(minWidth: 64)
+            Text(suffix)
                 .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 2)
-    }
-
-    private var ingredientDetail: String {
-        let serving = component.amount.trimmingCharacters(in: .whitespacesAndNewlines)
-        if serving.isEmpty {
-            return "\(component.calories) cal · \(component.protein)g protein"
-        }
-        return "\(serving) · \(component.calories) cal · \(component.protein)g protein"
     }
 }
 
@@ -833,12 +858,23 @@ struct LogSavedMealSheet: View {
 
     let meal: SavedMeal
     let logDate: Date
+    var onLogged: (String) -> Void
+    var onLogFailed: (String) -> Void
 
     @State private var mealType: MealType = .lunch
+    @State private var isLogging = false
+    @State private var logError: String?
 
-    init(meal: SavedMeal, logDate: Date = .now) {
+    init(
+        meal: SavedMeal,
+        logDate: Date = .now,
+        onLogged: @escaping (String) -> Void = { _ in },
+        onLogFailed: @escaping (String) -> Void = { _ in }
+    ) {
         self.meal = meal
         self.logDate = logDate
+        self.onLogged = onLogged
+        self.onLogFailed = onLogFailed
     }
 
     var body: some View {
@@ -847,12 +883,16 @@ struct LogSavedMealSheet: View {
                 Section("Meal") {
                     Text(meal.name)
                         .font(.headline)
-                    ForEach(meal.components) { component in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(component.amount.isEmpty ? component.name : "\(component.amount) \(component.name)")
-                            Text("\(component.calories) cal · P \(component.protein)g")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    // Only show a breakdown when the meal still has multiple
+                    // ingredient rows (legacy ingredient-built meals).
+                    if meal.components.count > 1 {
+                        ForEach(meal.components) { component in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(component.amount.isEmpty ? component.name : "\(component.amount) \(component.name)")
+                                Text("\(component.calories) cal · P \(component.protein)g")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -871,18 +911,45 @@ struct LogSavedMealSheet: View {
                         }
                     }
                 }
+
+                if let logError {
+                    Section {
+                        Text(logError)
+                            .font(.caption)
+                            .foregroundStyle(Color(red: 0.92, green: 0.45, blue: 0.42))
+                            .accessibilityIdentifier("logSavedMealError")
+                    }
+                }
             }
             .navigationTitle("Log Meal")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isLogging)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Log") {
-                        dataStore.logSavedMeal(meal, as: mealType, on: logDate)
-                        dismiss()
+                    Button(isLogging ? "Logging…" : "Log") {
+                        logMeal()
                     }
+                    .disabled(isLogging)
                 }
+            }
+        }
+    }
+
+    private func logMeal() {
+        logError = nil
+        isLogging = true
+        Task { @MainActor in
+            defer { isLogging = false }
+            do {
+                try await dataStore.logSavedMealAwaitingCloud(meal, as: mealType, on: logDate)
+                onLogged(meal.name)
+                dismiss()
+            } catch {
+                let message = error.localizedDescription
+                logError = message
+                onLogFailed(message)
             }
         }
     }

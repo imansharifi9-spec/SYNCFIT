@@ -73,7 +73,7 @@ struct SyncFitAICoachCard: View {
                 Spacer(minLength: 8)
 
                 Button(action: onViewPlan) {
-                    Text(SyncFitPlusBrand.viewPlanButton)
+                    Text(SyncFitPlusBrand.openAICoachButton)
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(CoachCardColors.accent)
                         .padding(.horizontal, 10)

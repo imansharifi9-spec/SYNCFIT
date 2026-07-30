@@ -48,6 +48,7 @@ struct AuthView: View {
                         TextField("Email", text: $email)
                             .textContentType(.emailAddress)
                             .keyboardType(.emailAddress)
+                            .accessibilityIdentifier("authEmailField")
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .padding()
@@ -56,6 +57,7 @@ struct AuthView: View {
 
                         SecureField("Password", text: $password)
                             .textContentType(isSignUp ? .newPassword : .password)
+                            .accessibilityIdentifier("authPasswordField")
                             .padding()
                             .background(SyncFitTheme.card)
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -94,6 +96,7 @@ struct AuthView: View {
                         }
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(!canSubmit)
+                        .accessibilityIdentifier("authSubmitButton")
 
                         Button(isSignUp ? "Already have an account? Sign in" : "New here? Create an account") {
                             isSignUp.toggle()

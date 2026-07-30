@@ -18,6 +18,13 @@ struct SyncFitPlusUpgradeSheet: View {
                     featuresCard
                     pricingCard
                     Button {
+                        // Set synchronously so a second tap can't spawn another Task
+                        // before `purchaseSyncFitPlus` runs (overlapping Product.purchase hangs StoreKit Testing).
+                        guard !isPurchasing else {
+                            print("[Subscription] Upgrade sheet tap ignored — purchase already in progress")
+                            return
+                        }
+                        isPurchasing = true
                         Task { await purchaseSyncFitPlus() }
                     } label: {
                         if isPurchasing {
@@ -74,7 +81,6 @@ struct SyncFitPlusUpgradeSheet: View {
     }
 
     private func purchaseSyncFitPlus() async {
-        isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
         do {
@@ -85,6 +91,7 @@ struct SyncFitPlusUpgradeSheet: View {
             if subscriptionManager.isSubscribed, !subscriptionManager.hasPendingFirestoreSync {
                 dismiss()
             }
+            print("[Subscription] Upgrade sheet purchase finished (spinner clearing)")
         } catch {
             purchaseError = error.localizedDescription
             print("[Subscription] Upgrade sheet purchase FAILED: \(error)")

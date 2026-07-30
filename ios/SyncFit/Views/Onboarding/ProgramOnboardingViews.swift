@@ -389,7 +389,7 @@ struct ProgramTemplatePreviewView: View {
             Button("Replace", role: .destructive) { performImport() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will replace your current schedule. Your workout history is kept.")
+            Text("This will replace your current schedule. Logged workouts and PRs are kept; only unfinished planned days are cleared.")
         }
     }
 

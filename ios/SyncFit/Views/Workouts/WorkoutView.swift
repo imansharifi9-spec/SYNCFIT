@@ -1,12 +1,39 @@
 import SwiftUI
 
+/// Keeps Workouts tab date selection aligned with the calendar day without yanking
+/// users who intentionally browsed another day.
+enum WorkoutSelectedDatePolicy {
+    /// When following today, snap to start-of-day for `now`; otherwise keep `current`.
+    static func resolvedDate(
+        current: Date,
+        followsToday: Bool,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> Date {
+        if followsToday {
+            return calendar.startOfDay(for: now)
+        }
+        return calendar.startOfDay(for: current)
+    }
+
+    /// Manual strip/calendar picks: follow today only while the selection is today.
+    static func followsTodayAfterSelection(
+        _ selectedDate: Date,
+        calendar: Calendar = .current
+    ) -> Bool {
+        calendar.isDateInToday(selectedDate)
+    }
+}
+
 struct WorkoutView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var dataStore: FitnessDataStore
     @EnvironmentObject private var healthKit: HealthKitService
     @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedDate = Date.now
+    @State private var followsToday = true
     @State private var showingLogSheet = false
     @State private var editingWorkout: WorkoutEntry?
     @State private var editingRoutine: WorkoutRoutine?
@@ -28,7 +55,7 @@ struct WorkoutView: View {
     }
 
     private var dayHeroTitle: String {
-        dataStore.routineDisplayName(for: selectedDate)
+        dataStore.workoutDayDisplayTitle(for: selectedDate)
     }
 
     private var scheduleAccentColor: Color {
@@ -210,17 +237,26 @@ struct WorkoutView: View {
                 }
             }
             .onAppear {
-                syncSelectedDayFromSchedule()
+                refreshWorkoutDayContext()
                 if appState.shouldPresentScheduleSetup {
                     showingScheduleSetup = true
                     appState.shouldPresentScheduleSetup = false
                 }
                 handlePendingHomeWorkoutAction()
             }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    refreshWorkoutDayContext()
+                }
+            }
+            .onChange(of: dataStore.currentCalendarDay) { _, _ in
+                refreshWorkoutDayContext()
+            }
             .onChange(of: appState.pendingWorkoutHomeAction) { _, _ in
                 handlePendingHomeWorkoutAction()
             }
-            .onChange(of: selectedDate) { _, _ in
+            .onChange(of: selectedDate) { _, newDate in
+                followsToday = WorkoutSelectedDatePolicy.followsTodayAfterSelection(newDate)
                 syncSelectedDayFromSchedule()
             }
             .onChange(of: dataStore.weekSchedule) { _, _ in
@@ -250,6 +286,15 @@ struct WorkoutView: View {
         }
     }
 
+    private func refreshWorkoutDayContext() {
+        dataStore.refreshCurrentCalendarDayIfNeeded()
+        selectedDate = WorkoutSelectedDatePolicy.resolvedDate(
+            current: selectedDate,
+            followsToday: followsToday
+        )
+        syncSelectedDayFromSchedule()
+    }
+
     private func syncSelectedDayFromSchedule() {
         dataStore.syncWorkoutDayFromSchedule(for: selectedDate)
     }
@@ -257,6 +302,7 @@ struct WorkoutView: View {
     private func handlePendingHomeWorkoutAction() {
         guard let action = appState.pendingWorkoutHomeAction else { return }
         appState.pendingWorkoutHomeAction = nil
+        followsToday = true
         selectedDate = .now
         syncSelectedDayFromSchedule()
 
@@ -426,9 +472,9 @@ private struct WorkoutSessionStickyCTA: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(SyncFitTheme.accentBright)
+                .background(SyncFitTheme.primaryAction)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: SyncFitTheme.accentBright.opacity(0.25), radius: 6, y: 3)
+                .shadow(color: SyncFitTheme.primaryAction.opacity(0.25), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
@@ -1048,10 +1094,9 @@ private struct WorkoutRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
-                ExerciseIllustrationView(
+                ExerciseThumbnailView(
                     exerciseName: workout.exercise.name,
-                    muscleGroup: workout.exercise.muscleGroup,
-                    style: .thumbnail
+                    muscleGroup: workout.exercise.muscleGroup
                 )
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -1117,6 +1162,15 @@ struct EditWorkoutSheet: View {
         NavigationStack {
             Form {
                 Section {
+                    ExerciseDemoGIFView(
+                        exerciseName: exerciseName,
+                        muscleGroup: muscleGroup
+                    )
+                    // Stable identity: Form row rebuilds must not reset @State / re-fire .task.
+                    .id(ExerciseDemoGIFSessionCache.normalizedKey(exerciseName))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
+
                     SelectedExerciseCard(
                         exercise: Exercise(name: exerciseName, muscleGroup: muscleGroup),
                         pulse: false,

@@ -8,6 +8,11 @@ struct WeightLineChartView: View {
         entries.sorted { $0.date < $1.date }
     }
 
+    private var isFlat: Bool {
+        guard let first = sortedEntries.first?.weight else { return true }
+        return sortedEntries.allSatisfy { abs($0.weight - first) < 0.001 }
+    }
+
     private var yDomain: ClosedRange<Double> {
         let values = sortedEntries.map(\.weight)
         guard let min = values.min(), let max = values.max() else {
@@ -50,7 +55,7 @@ struct WeightLineChartView: View {
                             endPoint: .bottom
                         )
                     )
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(isFlat ? .linear : .catmullRom)
 
                     LineMark(
                         x: .value("Date", entry.date),
@@ -58,7 +63,7 @@ struct WeightLineChartView: View {
                     )
                     .foregroundStyle(SyncFitTheme.accent)
                     .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(isFlat ? .linear : .catmullRom)
 
                     PointMark(
                         x: .value("Date", entry.date),

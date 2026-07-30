@@ -9,7 +9,7 @@ struct SyncFitApp: App {
     @StateObject private var appState: AppState
     @StateObject private var dataStore: FitnessDataStore
     @StateObject private var healthKit = HealthKitService()
-    @StateObject private var authManager: AuthenticationManager
+     @StateObject private var authManager: AuthenticationManager
     @StateObject private var firestore: FirestoreDatabaseManager
     @StateObject private var coachService: CoachService
     @StateObject private var chatService: CoachChatService
@@ -88,7 +88,7 @@ struct SyncFitApp: App {
         dataStore.firestore = firestore
         coachService.configure(firestore: firestore)
         coachService.seedFromLocalStore(dataStore.coaches)
-        subscriptionManager.configure(firestore: firestore, appState: appState)
+        subscriptionManager.configure(firestore: firestore)
         dataStore.isHealthSyncEnabled = { [weak appState] in
             appState?.appleHealthSyncEnabled ?? false
         }

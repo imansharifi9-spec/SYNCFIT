@@ -204,7 +204,7 @@ enum AIInsightService {
     private static func goalPaceInsight(profile: UserProfile, dataStore: FitnessDataStore) -> AIInsight? {
         let proteinTarget = max(profile.proteinTarget, 1)
         let proteinProgress = min(Double(dataStore.todaysProtein) / Double(proteinTarget), 1)
-        let workoutProgress = dataStore.hasWorkoutToday ? 1.0 : 0.0
+        let workoutProgress = dataStore.workoutGoalMet(on: .now) ? 1.0 : 0.0
         let mission = (proteinProgress + workoutProgress) / 2
         let percent = Int((mission * 100).rounded())
 
@@ -220,7 +220,7 @@ enum AIInsightService {
         if dataStore.todaysProtein < proteinTarget {
             missing.append("protein")
         }
-        if !dataStore.hasWorkoutToday {
+        if !dataStore.workoutGoalMet(on: .now) {
             missing.append("today's workout")
         }
 

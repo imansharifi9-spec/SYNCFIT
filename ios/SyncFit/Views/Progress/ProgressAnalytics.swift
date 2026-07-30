@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum ProgressTimeRange: String, CaseIterable, Identifiable {
     case oneMonth = "1M"
@@ -41,12 +42,15 @@ struct ProgressDataSource {
         profile: UserProfile,
         userId: String? = nil
     ) -> ProgressDataSource {
-        ProgressDataSource(
-            userId: userId,
+        // Default to the signed-in account (not the legacy "local" folder) so
+        // Progress photos appear after upload / session restore.
+        let resolvedUserId = userId ?? ProgressPhotoStorage.currentUserId
+        return ProgressDataSource(
+            userId: resolvedUserId,
             workouts: dataStore.workouts,
             foods: dataStore.foods,
             weights: dataStore.weights,
-            progressPhotos: dataStore.progressPhotos(for: userId),
+            progressPhotos: dataStore.progressPhotos(for: resolvedUserId),
             profile: profile
         )
     }
@@ -92,12 +96,21 @@ struct StrengthChartData {
 struct ExercisePRRow: Identifiable {
     let id: String
     let exerciseName: String
+    let muscleGroup: String
     let prWeight: Double
     let deltaText: String
     let prDate: Date
 
     var deltaUsesAccentGreen: Bool {
-        deltaText.hasPrefix("↑ +")
+        deltaText.hasPrefix("↑ +") || deltaText == "First PR"
+    }
+
+    var categoryAccent: Color {
+        let group = Exercise.resolvePrimaryMuscleGroup(
+            name: exerciseName,
+            catalogGroup: muscleGroup
+        )
+        return MuscleGroupArt.accentColor(for: group)
     }
 }
 
@@ -312,11 +325,35 @@ enum ProgressAnalytics {
             )
         }
 
+        // Need 2+ distinct session days before any line/captions — never invent
+        // a second point or a "1 wk ago" label from a single today's log.
+        guard points.count >= 2 else {
+            return StrengthChartData(
+                exerciseName: exerciseName,
+                points: [],
+                startCaption: nil,
+                endCaption: nil,
+                isEmpty: false,
+                showsTrendHint: true
+            )
+        }
+
         if points.count > 8 {
             points = bucketByWeek(points, calendar: calendar)
         }
 
         let display = Array(points.suffix(8))
+        // Bucketing can collapse back to one point; still require a real trend.
+        guard display.count >= 2 else {
+            return StrengthChartData(
+                exerciseName: exerciseName,
+                points: [],
+                startCaption: nil,
+                endCaption: nil,
+                isEmpty: false,
+                showsTrendHint: true
+            )
+        }
 
         #if DEBUG
         logStrengthChartSessions(
@@ -352,7 +389,7 @@ enum ProgressAnalytics {
             startCaption: startCaption,
             endCaption: endCaption,
             isEmpty: false,
-            showsTrendHint: display.count < 4
+            showsTrendHint: false
         )
     }
 
@@ -364,20 +401,20 @@ enum ProgressAnalytics {
     }
 
     static func allPersonalRecords(source: ProgressDataSource, calendar: Calendar = .current) -> [ExercisePRRow] {
-        var displayNames: [String] = []
+        var displayNames: [(name: String, muscleGroup: String)] = []
         var seenKeys = Set<String>()
         for entry in source.workouts.sorted(by: { $0.date < $1.date }) {
             let key = entry.exercise.name.lowercased()
             guard seenKeys.insert(key).inserted else { continue }
-            displayNames.append(entry.exercise.name)
+            displayNames.append((entry.exercise.name, entry.exercise.muscleGroup))
         }
 
-        return displayNames.compactMap { name in
-            guard let allTime = ExerciseMaxWeight.allTimeMax(for: name, in: source.workouts) else {
+        return displayNames.compactMap { item in
+            guard let allTime = ExerciseMaxWeight.allTimeMax(for: item.name, in: source.workouts) else {
                 return nil
             }
             let firstSession = ExerciseMaxWeight.firstSessionMax(
-                for: name,
+                for: item.name,
                 in: source.workouts,
                 calendar: calendar
             ) ?? allTime.weight
@@ -385,8 +422,9 @@ enum ProgressAnalytics {
             let deltaText = gain > 0 ? "↑ +\(gain) lbs" : "First PR"
 
             return ExercisePRRow(
-                id: name,
-                exerciseName: name,
+                id: item.name,
+                exerciseName: item.name,
+                muscleGroup: item.muscleGroup,
                 prWeight: allTime.weight,
                 deltaText: deltaText,
                 prDate: allTime.date
@@ -515,7 +553,11 @@ enum ProgressAnalytics {
     ) -> String? {
         guard let date, weight > 0 else { return nil }
         if range == .oneMonth {
-            let weeks = max(1, calendar.dateComponents([.weekOfYear], from: date, to: .now).weekOfYear ?? 1)
+            let weeks = calendar.dateComponents([.weekOfYear], from: date, to: .now).weekOfYear ?? 0
+            if weeks <= 0 {
+                // Same calendar week as now — don't fabricate "1 wk ago".
+                return "\(shortDateLabel(date, calendar: calendar)) · \(SyncFitFormat.decimal(weight)) lbs"
+            }
             return "\(weeks) wk\(weeks == 1 ? "" : "s") ago · \(SyncFitFormat.decimal(weight)) lbs"
         }
         return "\(shortDateLabel(date, calendar: calendar)) · \(SyncFitFormat.decimal(weight)) lbs"

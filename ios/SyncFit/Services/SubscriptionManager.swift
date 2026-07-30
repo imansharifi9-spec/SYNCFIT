@@ -28,24 +28,31 @@ final class SubscriptionManager: ObservableObject {
     @Published private(set) var hasPendingFirestoreSync = false
 
     private weak var firestore: FirestoreDatabaseManager?
-    private weak var appState: AppState?
 
     private var updatesTask: Task<Void, Never>?
     private var didStart = false
+    /// Prevents overlapping `Product.purchase()` calls (StoreKit Testing often hangs forever on concurrent purchases).
+    private var isPurchaseInFlight = false
+    /// StoreKit's purchase sheet can wait indefinitely with no error; surface that as a timeout.
+    private static let purchaseTimeoutNanoseconds: UInt64 = 90_000_000_000
 
-    func configure(firestore: FirestoreDatabaseManager, appState: AppState) {
+    func configure(firestore: FirestoreDatabaseManager) {
         self.firestore = firestore
-        self.appState = appState
-        refreshPendingFlag()
+        refreshPendingFlag(callSite: "SubscriptionManager.configure")
     }
 
     /// Clears in-memory subscription flags on Firebase sign-out so the next account
     /// never inherits the previous user's published state in this process.
     /// Pending UserDefaults writes are kept (uid-scoped) for when that user returns.
     func resetForLogout() {
-        applyLocalStatus(status: "none", expiresAt: nil, subscribed: false)
+        applyLocalStatus(
+            status: "none",
+            expiresAt: nil,
+            subscribed: false,
+            callSite: "SubscriptionManager.resetForLogout"
+        )
         lastErrorMessage = nil
-        refreshPendingFlag()
+        refreshPendingFlag(callSite: "SubscriptionManager.resetForLogout")
         print("[Subscription] Reset on logout — isSubscribed set to false")
         if isSubscribed {
             print("❌ Logout reset FAILED — isSubscribed still true after logout.")
@@ -72,7 +79,11 @@ final class SubscriptionManager: ObservableObject {
             return
         }
         didStart = true
-        print("[Subscription] start() — lifetime Transaction.updates listener")
+        print(
+            "[SubscriptionFlag] \(Self.flagTimestamp()) start() — " +
+            "isSubscribed defaults to \(isSubscribed) until entitlement refresh; " +
+            "lifetime Transaction.updates listener attaching"
+        )
         updatesTask = Task { [weak self] in
             await self?.listenForTransactionUpdates()
         }
@@ -110,6 +121,13 @@ final class SubscriptionManager: ObservableObject {
     // MARK: - Purchase / restore
 
     func purchase() async throws {
+        if isPurchaseInFlight {
+            print("[Subscription] purchase FAILED: already in flight (duplicate call ignored)")
+            throw SubscriptionError.purchaseAlreadyInFlight
+        }
+        isPurchaseInFlight = true
+        defer { isPurchaseInFlight = false }
+
         if products.isEmpty {
             print("[Subscription] purchase — products empty, reloading…")
             await loadProducts()
@@ -119,25 +137,44 @@ final class SubscriptionManager: ObservableObject {
                 "SyncFit+ product not loaded. In Xcode: Product → Scheme → Edit Scheme → " +
                 "Run → Options → StoreKit Configuration → select SyncFit.storekit. " +
                 "Then stop the app and run again. (looking for \(Self.plusMonthlyProductID))"
-            print("[Subscription] purchase FAILED — \(message)")
+            print("[Subscription] purchase FAILED: \(message)")
             lastErrorMessage = message
             throw SubscriptionError.productUnavailable
         }
 
         print("[Subscription] purchase START product=\(product.id)")
-        let result = try await product.purchase()
+        // TEMP DIAGNOSTIC: timeout wrapper removed to isolate whether any task-group
+        // form of the wrapper causes instant .userCancelled. Direct call, no race —
+        // identical to the pre-timeout code path. Restore the watchdog once verified.
+        let result: Product.PurchaseResult
+        do {
+            result = try await product.purchase()
+        } catch {
+            print("[Subscription] purchase FAILED: \(error)")
+            lastErrorMessage = error.localizedDescription
+            throw error
+        }
+
         switch result {
         case .success(let verification):
-            let transaction = try checkVerified(verification)
-            print("[Subscription] purchase OK transactionID=\(transaction.id) product=\(transaction.productID)")
-            await transaction.finish()
-            await refreshEntitlements(reason: "purchase_success")
+            do {
+                let transaction = try checkVerified(verification)
+                print("[Subscription] purchase OK transactionID=\(transaction.id) product=\(transaction.productID)")
+                await transaction.finish()
+                print("[Subscription] purchase — refreshing entitlements after success…")
+                await refreshEntitlements(reason: "purchase_success")
+                print("[Subscription] purchase — entitlement refresh finished")
+            } catch {
+                print("[Subscription] purchase FAILED: verification \(error)")
+                lastErrorMessage = error.localizedDescription
+                throw error
+            }
         case .userCancelled:
-            print("[Subscription] purchase cancelled by user")
+            print("[Subscription] purchase FAILED: cancelled by user")
         case .pending:
-            print("[Subscription] purchase pending (Ask to Buy / deferred)")
+            print("[Subscription] purchase FAILED: pending (Ask to Buy / deferred) — no transaction yet")
         @unknown default:
-            print("[Subscription] purchase unknown result")
+            print("[Subscription] purchase FAILED: unknown Product.PurchaseResult")
         }
     }
 
@@ -188,19 +225,35 @@ final class SubscriptionManager: ObservableObject {
 
         let now = Date()
         let status: String
+        let site = "SubscriptionManager.refreshEntitlements(reason=\(reason))"
         if let latestPlus {
             let expires = latestPlus.expirationDate
             let stillActive = expires.map { $0 > now } ?? true
             if stillActive {
                 status = "active"
-                applyLocalStatus(status: status, expiresAt: expires, subscribed: true)
+                applyLocalStatus(
+                    status: status,
+                    expiresAt: expires,
+                    subscribed: true,
+                    callSite: site
+                )
             } else {
                 status = "expired"
-                applyLocalStatus(status: status, expiresAt: expires, subscribed: false)
+                applyLocalStatus(
+                    status: status,
+                    expiresAt: expires,
+                    subscribed: false,
+                    callSite: site
+                )
             }
         } else {
             status = "none"
-            applyLocalStatus(status: status, expiresAt: nil, subscribed: false)
+            applyLocalStatus(
+                status: status,
+                expiresAt: nil,
+                subscribed: false,
+                callSite: site
+            )
         }
 
         print("[Subscription] Entitlement check result for uid=\(uid): \(status)")
@@ -305,7 +358,7 @@ final class SubscriptionManager: ObservableObject {
         guard let uid = Auth.auth().currentUser?.uid,
               let pending = loadPendingWrite(),
               pending.uid == uid else {
-            refreshPendingFlag()
+            refreshPendingFlag(callSite: "SubscriptionManager.flushPendingFirestoreWriteIfNeeded")
             return
         }
 
@@ -362,7 +415,7 @@ final class SubscriptionManager: ObservableObject {
                     print("[Subscription] Firestore write OK subscriptionStatus=\(status)")
                 }
                 clearPendingWrite()
-                refreshPendingFlag()
+                refreshPendingFlag(callSite: "SubscriptionManager.syncSubscriptionToFirestore(success)")
                 lastErrorMessage = nil
                 return
             } catch {
@@ -373,7 +426,7 @@ final class SubscriptionManager: ObservableObject {
 
         // All attempts failed — keep local entitlement; queue for later; no blocking UI.
         savePendingWrite(uid: uid, status: status, expiresAt: expiresAt)
-        refreshPendingFlag()
+        refreshPendingFlag(callSite: "SubscriptionManager.syncSubscriptionToFirestore(exhausted)")
         handleFirestoreWriteFailure(lastError ?? SubscriptionError.firestoreUnavailable)
     }
 
@@ -426,22 +479,81 @@ final class SubscriptionManager: ObservableObject {
         print("[Subscription] Pending write CLEARED")
     }
 
-    private func refreshPendingFlag() {
+    private func refreshPendingFlag(callSite: String) {
+        let next: Bool
         if let uid = Auth.auth().currentUser?.uid,
            let pending = loadPendingWrite(),
            pending.uid == uid {
-            hasPendingFirestoreSync = true
+            next = true
         } else {
-            hasPendingFirestoreSync = false
+            next = false
+        }
+        if hasPendingFirestoreSync != next {
+            logFlagChange(
+                name: "hasPendingFirestoreSync",
+                from: "\(hasPendingFirestoreSync)",
+                to: "\(next)",
+                callSite: callSite
+            )
+            hasPendingFirestoreSync = next
+        } else {
+            hasPendingFirestoreSync = next
         }
     }
 
     // MARK: - Helpers
 
-    private func applyLocalStatus(status: String, expiresAt: Date?, subscribed: Bool) {
+    private func applyLocalStatus(
+        status: String,
+        expiresAt: Date?,
+        subscribed: Bool,
+        callSite: String
+    ) {
+        if subscriptionStatus != status {
+            logFlagChange(
+                name: "subscriptionStatus",
+                from: subscriptionStatus,
+                to: status,
+                callSite: callSite
+            )
+        }
+        let fromExpires = subscriptionExpiresAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil"
+        let toExpires = expiresAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil"
+        if subscriptionExpiresAt != expiresAt {
+            logFlagChange(
+                name: "subscriptionExpiresAt",
+                from: fromExpires,
+                to: toExpires,
+                callSite: callSite
+            )
+        }
+        if isSubscribed != subscribed {
+            logFlagChange(
+                name: "isSubscribed",
+                from: "\(isSubscribed)",
+                to: "\(subscribed)",
+                callSite: callSite
+            )
+        } else {
+            print(
+                "[SubscriptionFlag] \(Self.flagTimestamp()) isSubscribed unchanged=\(subscribed) " +
+                "via \(callSite)"
+            )
+        }
+
         subscriptionStatus = status
         subscriptionExpiresAt = expiresAt
         isSubscribed = subscribed
+    }
+
+    private func logFlagChange(name: String, from: String, to: String, callSite: String) {
+        print("[SubscriptionFlag] \(Self.flagTimestamp()) \(name) \(from) → \(to) via \(callSite)")
+    }
+
+    private static func flagTimestamp() -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: Date())
     }
 
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
@@ -457,6 +569,8 @@ final class SubscriptionManager: ObservableObject {
 enum SubscriptionError: LocalizedError {
     case productUnavailable
     case firestoreUnavailable
+    case purchaseAlreadyInFlight
+    case purchaseTimedOut
 
     var errorDescription: String? {
         switch self {
@@ -464,6 +578,10 @@ enum SubscriptionError: LocalizedError {
             return "SyncFit+ product didn’t load. Edit Scheme → Run → Options → set StoreKit Configuration to SyncFit.storekit, then rerun."
         case .firestoreUnavailable:
             return "Firestore is unavailable."
+        case .purchaseAlreadyInFlight:
+            return "A SyncFit+ purchase is already in progress."
+        case .purchaseTimedOut:
+            return "The purchase didn’t complete in time. Dismiss any StoreKit sheet and try again."
         }
     }
 }

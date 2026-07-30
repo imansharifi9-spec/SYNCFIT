@@ -40,6 +40,18 @@
                ReferencedContainer = "container:SyncFit.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO"
+            useTestSelectionWhitelist = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "U40000000000000000000001"
+               BuildableName = "SyncFitUITests.xctest"
+               BlueprintName = "SyncFitUITests"
+               ReferencedContainer = "container:SyncFit.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
@@ -51,8 +63,7 @@
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
-      allowLocationSimulation = "YES"
-      storeKitConfigurationFileReference = "SyncFit/SyncFit.storekit">
+      allowLocationSimulation = "YES">
       <BuildableProductRunnable
          runnableDebuggingMode = "0">
          <BuildableReference

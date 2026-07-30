@@ -48,11 +48,15 @@ struct FoodPortionView: View {
     let logDate: Date
     let locksMeal: Bool
     var onIngredientAdded: ((MealComponent) -> Void)?
-    var onLogged: () -> Void
+    /// Called only after a confirmed cloud write (or ingredient add).
+    var onLogged: (String) -> Void
+    var onLogFailed: (String) -> Void
 
     @State private var meal: MealType
     @State private var amountText = "100"
     @State private var unit: FoodAmountUnit = .grams
+    @State private var isSaving = false
+    @State private var saveError: String?
     @FocusState private var amountFocused: Bool
 
     init(
@@ -61,13 +65,15 @@ struct FoodPortionView: View {
         selectedMeal: MealType,
         locksMeal: Bool = false,
         onIngredientAdded: ((MealComponent) -> Void)? = nil,
-        onLogged: @escaping () -> Void
+        onLogged: @escaping (String) -> Void,
+        onLogFailed: @escaping (String) -> Void = { _ in }
     ) {
         self.item = item
         self.logDate = logDate
         self.locksMeal = locksMeal
         self.onIngredientAdded = onIngredientAdded
         self.onLogged = onLogged
+        self.onLogFailed = onLogFailed
         _meal = State(initialValue: selectedMeal)
     }
 
@@ -128,11 +134,27 @@ struct FoodPortionView: View {
                 .padding(.bottom, 16)
             }
 
-            Button(confirmButtonTitle) {
+            if let saveError {
+                Text(saveError)
+                    .font(.caption)
+                    .foregroundStyle(Color(red: 0.92, green: 0.45, blue: 0.42))
+                    .padding(.bottom, 8)
+                    .accessibilityIdentifier("foodPortionLogError")
+            }
+
+            Button {
                 save()
+            } label: {
+                HStack(spacing: 8) {
+                    if isSaving {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Text(isSaving ? "Logging…" : confirmButtonTitle)
+                }
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(amount <= 0 || scaled.calories <= 0)
+            .disabled(amount <= 0 || scaled.calories <= 0 || isSaving)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -202,6 +224,7 @@ struct FoodPortionView: View {
 
     private func save() {
         let serving = unit.servingLabel(amount: amount)
+        saveError = nil
 
         if let onIngredientAdded {
             onIngredientAdded(
@@ -214,20 +237,33 @@ struct FoodPortionView: View {
                     fat: scaled.fat
                 )
             )
-        } else {
-            let entry = FoodEntry(
-                name: item.name,
-                calories: scaled.calories,
-                protein: scaled.protein,
-                carbs: scaled.carbs,
-                fat: scaled.fat,
-                meal: meal,
-                date: Calendar.current.startOfDay(for: logDate),
-                servingLabel: serving
-            )
-            dataStore.addFood(entry)
+            onLogged(item.name)
+            return
         }
-        onLogged()
+
+        let entry = FoodEntry(
+            name: item.name,
+            calories: scaled.calories,
+            protein: scaled.protein,
+            carbs: scaled.carbs,
+            fat: scaled.fat,
+            meal: meal,
+            date: Calendar.current.startOfDay(for: logDate),
+            servingLabel: serving
+        )
+
+        isSaving = true
+        Task { @MainActor in
+            defer { isSaving = false }
+            do {
+                try await dataStore.addFoodAwaitingCloud(entry)
+                onLogged(item.name)
+            } catch {
+                let message = error.localizedDescription
+                saveError = message
+                onLogFailed(message)
+            }
+        }
     }
 }
 

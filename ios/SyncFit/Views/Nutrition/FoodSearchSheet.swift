@@ -30,6 +30,9 @@ struct FoodSearchSheet: View {
     @State private var editingSavedMeal: SavedMeal?
     @State private var loggingSavedMeal: SavedMeal?
     @State private var showingCreateMealSheet = false
+    @State private var successToastMessage: String?
+    @State private var errorToastMessage: String?
+    @State private var dismissAfterSuccessTask: Task<Void, Never>?
     @FocusState private var searchFocused: Bool
 
     init(
@@ -79,7 +82,16 @@ struct FoodSearchSheet: View {
                     selectedMeal: selectedMeal,
                     locksMeal: scopedMeal != nil || isIngredientMode,
                     onIngredientAdded: onIngredientAdded,
-                    onLogged: { dismiss() }
+                    onLogged: { name in
+                        if isIngredientMode {
+                            dismiss()
+                        } else {
+                            presentLogSuccess(name)
+                        }
+                    },
+                    onLogFailed: { message in
+                        presentLogFailure(message)
+                    }
                 )
             }
             .fullScreenCover(isPresented: $showingScanner) {
@@ -93,13 +105,31 @@ struct FoodSearchSheet: View {
                 .ignoresSafeArea()
             }
             .sheet(isPresented: $showingManualEntry) {
-                ManualFoodEntrySheet(logDate: logDate, defaultMeal: selectedMeal)
+                ManualFoodEntrySheet(
+                    logDate: logDate,
+                    defaultMeal: selectedMeal,
+                    onLogged: { name in
+                        presentLogSuccess(name)
+                    },
+                    onLogFailed: { message in
+                        presentLogFailure(message)
+                    }
+                )
             }
             .sheet(item: $editingSavedMeal) { meal in
                 SavedMealEditorSheet(meal: meal)
             }
             .sheet(item: $loggingSavedMeal) { meal in
-                LogSavedMealSheet(meal: meal, logDate: logDate)
+                LogSavedMealSheet(
+                    meal: meal,
+                    logDate: logDate,
+                    onLogged: { name in
+                        presentLogSuccess(name)
+                    },
+                    onLogFailed: { message in
+                        presentLogFailure(message)
+                    }
+                )
             }
             .sheet(isPresented: $showingCreateMealSheet) {
                 SavedMealEditorSheet()
@@ -120,9 +150,64 @@ struct FoodSearchSheet: View {
             .onChange(of: searchText) { _, _ in
                 runSearch()
             }
+            .onDisappear {
+                dismissAfterSuccessTask?.cancel()
+            }
+        }
+        .overlay(alignment: .top) {
+            VStack(spacing: 8) {
+                if let successToastMessage {
+                    SyncFitToastBanner(message: successToastMessage, style: .success)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                if let errorToastMessage {
+                    SyncFitToastBanner(message: errorToastMessage, style: .error)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .padding(.top, 8)
+            .animation(.spring(response: 0.35, dampingFraction: 0.86), value: successToastMessage)
+            .animation(.spring(response: 0.35, dampingFraction: 0.86), value: errorToastMessage)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+    }
+
+    private func presentLogSuccess(_ name: String) {
+        errorToastMessage = nil
+        let message = "Logged: \(name)"
+        withAnimation {
+            successToastMessage = message
+        }
+        #if canImport(UIKit)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        #endif
+
+        dismissAfterSuccessTask?.cancel()
+        dismissAfterSuccessTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_250_000_000)
+            guard !Task.isCancelled else { return }
+            dismiss()
+        }
+    }
+
+    private func presentLogFailure(_ message: String) {
+        successToastMessage = nil
+        withAnimation {
+            errorToastMessage = message
+        }
+        #if canImport(UIKit)
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        #endif
+
+        dismissAfterSuccessTask?.cancel()
+        dismissAfterSuccessTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation {
+                errorToastMessage = nil
+            }
+        }
     }
 
     private var searchBar: some View {

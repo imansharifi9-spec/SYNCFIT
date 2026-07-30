@@ -27,6 +27,46 @@ enum SyncFitTheme {
     }
 }
 
+/// Brief confirmation / error banner used after food logging (dark + green SyncFit chrome).
+struct SyncFitToastBanner: View {
+    enum Style {
+        case success
+        case error
+    }
+
+    let message: String
+    var style: Style = .success
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: style == .success ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(style == .success ? SyncFitTheme.accentBright : Color(red: 0.92, green: 0.45, blue: 0.42))
+            Text(message)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(
+                            style == .success
+                                ? SyncFitTheme.accentBright.opacity(0.4)
+                                : Color(red: 0.92, green: 0.45, blue: 0.42).opacity(0.45),
+                            lineWidth: 0.5
+                        )
+                )
+        )
+        .padding(.horizontal, 16)
+        .accessibilityIdentifier(style == .success ? "foodLogSuccessToast" : "foodLogErrorToast")
+    }
+}
 
 /// Small filled red circle — present/absent only (no count).
 struct UnreadDotBadge: View {
@@ -162,7 +202,9 @@ enum SyncFitPlusBrand {
         "Your workouts and nutrition, finally talking to each other. Unlock AI coaching that knows both."
     static let unlockButton = "Unlock SyncFit+ →"
     static let upgradeButton = "Upgrade to SyncFit+"
-    static let viewPlanButton = "View plan →"
+    static let openAICoachButton = "Open AI Coach →"
+    /// Kept as an alias so older call sites keep compiling; prefer `openAICoachButton`.
+    static let viewPlanButton = openAICoachButton
 }
 
 struct CalorieGoalDisplay {

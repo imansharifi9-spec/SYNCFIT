@@ -7,18 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		T10000000000000000000007 /* AICoachChatMarkdownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000006 /* AICoachChatMarkdownTests.swift */; };
+		E10000000000000000000007 /* CoachAIToolsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000007 /* CoachAIToolsService.swift */; };
+		E10000000000000000000008 /* DeleteAccountErrorMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000008 /* DeleteAccountErrorMapper.swift */; };
+		E10000000000000000000006 /* ExerciseMediaCacheVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000006 /* ExerciseMediaCacheVersion.swift */; };
+		E10000000000000000000004 /* ExerciseThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* ExerciseThumbnailCache.swift */; };
+		E10000000000000000000005 /* ExerciseThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000005 /* ExerciseThumbnailView.swift */; };
+		E10000000000000000000003 /* ExerciseMediaDiag.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* ExerciseMediaDiag.swift */; };
+		E10000000000000000000001 /* ExerciseMediaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* ExerciseMediaService.swift */; };
+		E10000000000000000000002 /* ExerciseDemoGIFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* ExerciseDemoGIFView.swift */; };
 		9D7893822239E831EA17D964 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = B5F7F9F0CA39C29E98DC83AA /* FirebaseFunctions */; };
 		A10000000000000000000001 /* SyncFitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* SyncFitApp.swift */; };
 		A10000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppState.swift */; };
 		A10000000000000000000003 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* UserProfile.swift */; };
 		A10000000000000000000004 /* SyncFitTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* SyncFitTheme.swift */; };
-		E10000000000000000000001 /* ExerciseMediaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* ExerciseMediaService.swift */; };
-		E10000000000000000000002 /* ExerciseDemoGIFView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* ExerciseDemoGIFView.swift */; };
-		E10000000000000000000003 /* ExerciseMediaDiag.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* ExerciseMediaDiag.swift */; };
-		E10000000000000000000004 /* ExerciseThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* ExerciseThumbnailCache.swift */; };
-		E10000000000000000000005 /* ExerciseThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000005 /* ExerciseThumbnailView.swift */; };
-		E10000000000000000000006 /* ExerciseMediaCacheVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000006 /* ExerciseMediaCacheVersion.swift */; };
 		A10000000000000000000005 /* FitnessDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* FitnessDataStore.swift */; };
 		A10000000000000000000006 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* RootView.swift */; };
 		A10000000000000000000007 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* MainTabView.swift */; };
@@ -35,7 +36,6 @@
 		A10000000000000000000018 /* SampleDataSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* SampleDataSeeder.swift */; };
 		A10000000000000000000019 /* ExerciseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* ExerciseLibrary.swift */; };
 		A10000000000000000000020 /* NutritionSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* NutritionSheets.swift */; };
-		A10000000000000000000067 /* MacroSummaryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000067 /* MacroSummaryViews.swift */; };
 		A10000000000000000000022 /* HistoryPeriod.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* HistoryPeriod.swift */; };
 		A10000000000000000000023 /* PeriodNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* PeriodNavigator.swift */; };
 		A10000000000000000000024 /* WorkoutRoutineSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* WorkoutRoutineSheets.swift */; };
@@ -79,6 +79,7 @@
 		A10000000000000000000062 /* ProgressComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000062 /* ProgressComponents.swift */; };
 		A10000000000000000000063 /* ProgressPhotoStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000063 /* ProgressPhotoStorage.swift */; };
 		A10000000000000000000064 /* ExerciseMaxWeight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000064 /* ExerciseMaxWeight.swift */; };
+		A10000000000000000000067 /* MacroSummaryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000067 /* MacroSummaryViews.swift */; };
 		A10000000000000000000071 /* CoachModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000071 /* CoachModels.swift */; };
 		A10000000000000000000072 /* CoachService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000072 /* CoachService.swift */; };
 		A10000000000000000000073 /* CoachProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000073 /* CoachProfileScreen.swift */; };
@@ -91,17 +92,25 @@
 		A1000000000000000000007A /* CoachDataSharingConsentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007A /* CoachDataSharingConsentView.swift */; };
 		A1000000000000000000007B /* CoachChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007B /* CoachChatService.swift */; };
 		A1000000000000000000007C /* CoachChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007C /* CoachChatView.swift */; };
-		A1000000000000000000007E /* CoachPlaceholderContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007E /* CoachPlaceholderContent.swift */; };
 		A1000000000000000000007D /* CoachClientDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007D /* CoachClientDataView.swift */; };
+		A1000000000000000000007E /* CoachPlaceholderContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000007E /* CoachPlaceholderContent.swift */; };
 		A10000000000000000000081 /* CoachRoutineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000081 /* CoachRoutineModels.swift */; };
 		A10000000000000000000082 /* CoachRoutineViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000082 /* CoachRoutineViews.swift */; };
 		A10000000000000000000083 /* UserPhotoStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000083 /* UserPhotoStorage.swift */; };
 		A10000000000000000000084 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000084 /* SubscriptionManager.swift */; };
+		T10000000000000000000003 /* ProgramReplaceHistoryPreservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000001 /* ProgramReplaceHistoryPreservationTests.swift */; };
+		T10000000000000000000004 /* WorkoutSelectedDatePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000005 /* WorkoutSelectedDatePolicyTests.swift */; };
+		T10000000000000000000007 /* AICoachChatMarkdownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000006 /* AICoachChatMarkdownTests.swift */; };
 		T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */; };
-		T1000000000000000000000A /* CoachCheckoutConfirmationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000000000000000000000B /* CoachCheckoutConfirmationTests.swift */; };
-		E10000000000000000000008 /* DeleteAccountErrorMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000008 /* DeleteAccountErrorMapper.swift */; };
-		T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */; };
 		T11000000000000000000001 /* CoachChatListenerLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */; };
+		T12000000000000000000001 /* SavedMealManualMacrosTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T12000000000000000000002 /* SavedMealManualMacrosTests.swift */; };
+		T13000000000000000000001 /* FoodLogAwaitingCloudTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T13000000000000000000002 /* FoodLogAwaitingCloudTests.swift */; };
+		T1000000000000000000000A /* CoachCheckoutConfirmationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000000000000000000000B /* CoachCheckoutConfirmationTests.swift */; };
+		T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */; };
+		U10000000000000000000001 /* DeleteAccountManualFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U20000000000000000000001 /* DeleteAccountManualFlowUITests.swift */; };
+		U10000000000000000000002 /* CoachStripeConnectOnboardingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U20000000000000000000004 /* CoachStripeConnectOnboardingUITests.swift */; };
+		U10000000000000000000003 /* CoachMessagesListenerLifecycleUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = U20000000000000000000005 /* CoachMessagesListenerLifecycleUITests.swift */; };
+		T1000000000000000000000E /* CoachStripeOnboardingCallbackValidatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T1000000000000000000000F /* CoachStripeOnboardingCallbackValidatorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -112,20 +121,20 @@
 			remoteGlobalIDString = A50000000000000000000001;
 			remoteInfo = SyncFit;
 		};
+		U50000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A80000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A50000000000000000000001;
+			remoteInfo = SyncFit;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		T10000000000000000000006 /* AICoachChatMarkdownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICoachChatMarkdownTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000001 /* SyncFitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFitApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* SyncFitTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFitTheme.swift; sourceTree = "<group>"; };
-		E20000000000000000000001 /* ExerciseMediaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaService.swift; sourceTree = "<group>"; };
-		E20000000000000000000002 /* ExerciseDemoGIFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseDemoGIFView.swift; sourceTree = "<group>"; };
-		E20000000000000000000003 /* ExerciseMediaDiag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaDiag.swift; sourceTree = "<group>"; };
-		E20000000000000000000004 /* ExerciseThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseThumbnailCache.swift; sourceTree = "<group>"; };
-		E20000000000000000000005 /* ExerciseThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseThumbnailView.swift; sourceTree = "<group>"; };
-		E20000000000000000000006 /* ExerciseMediaCacheVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaCacheVersion.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* FitnessDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FitnessDataStore.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
@@ -143,7 +152,6 @@
 		A20000000000000000000019 /* SampleDataSeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleDataSeeder.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* ExerciseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseLibrary.swift; sourceTree = "<group>"; };
 		A20000000000000000000021 /* NutritionSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionSheets.swift; sourceTree = "<group>"; };
-		A20000000000000000000067 /* MacroSummaryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroSummaryViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000023 /* HistoryPeriod.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPeriod.swift; sourceTree = "<group>"; };
 		A20000000000000000000024 /* PeriodNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeriodNavigator.swift; sourceTree = "<group>"; };
 		A20000000000000000000025 /* WorkoutRoutineSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutRoutineSheets.swift; sourceTree = "<group>"; };
@@ -167,7 +175,7 @@
 		A20000000000000000000043 /* AuthenticationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000044 /* FirestoreDatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirestoreDatabaseManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000045 /* FirebaseConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseConfiguration.swift; sourceTree = "<group>"; };
-		A20000000000000000000046 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = GoogleService-Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000046 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		A20000000000000000000047 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000000000000000000048 /* SignInWithAppleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInWithAppleButton.swift; sourceTree = "<group>"; };
 		A20000000000000000000051 /* ProgramTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramTemplates.swift; sourceTree = "<group>"; };
@@ -184,6 +192,7 @@
 		A20000000000000000000062 /* ProgressComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressComponents.swift; sourceTree = "<group>"; };
 		A20000000000000000000063 /* ProgressPhotoStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressPhotoStorage.swift; sourceTree = "<group>"; };
 		A20000000000000000000064 /* ExerciseMaxWeight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMaxWeight.swift; sourceTree = "<group>"; };
+		A20000000000000000000067 /* MacroSummaryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroSummaryViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000071 /* CoachModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000072 /* CoachService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachService.swift; sourceTree = "<group>"; };
 		A20000000000000000000073 /* CoachProfileScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachProfileScreen.swift; sourceTree = "<group>"; };
@@ -196,21 +205,38 @@
 		A2000000000000000000007A /* CoachDataSharingConsentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachDataSharingConsentView.swift; sourceTree = "<group>"; };
 		A2000000000000000000007B /* CoachChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachChatService.swift; sourceTree = "<group>"; };
 		A2000000000000000000007C /* CoachChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachChatView.swift; sourceTree = "<group>"; };
-		A2000000000000000000007E /* CoachPlaceholderContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachPlaceholderContent.swift; sourceTree = "<group>"; };
 		A2000000000000000000007D /* CoachClientDataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachClientDataView.swift; sourceTree = "<group>"; };
+		A2000000000000000000007E /* CoachPlaceholderContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachPlaceholderContent.swift; sourceTree = "<group>"; };
+		A2000000000000000000007F /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		A20000000000000000000080 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
 		A20000000000000000000081 /* CoachRoutineModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachRoutineModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000082 /* CoachRoutineViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachRoutineViews.swift; sourceTree = "<group>"; };
 		A20000000000000000000083 /* UserPhotoStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPhotoStorage.swift; sourceTree = "<group>"; };
 		A20000000000000000000084 /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
-		A20000000000000000000085 /* SyncFit.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; name = SyncFit.storekit; path = SyncFit.storekit; sourceTree = "<group>"; };
-		A2000000000000000000007F /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
-		A20000000000000000000080 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
+		E20000000000000000000007 /* CoachAIToolsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachAIToolsService.swift; sourceTree = "<group>"; };
+		E20000000000000000000008 /* DeleteAccountErrorMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountErrorMapper.swift; sourceTree = "<group>"; };
+		E20000000000000000000001 /* ExerciseMediaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaService.swift; sourceTree = "<group>"; };
+		E20000000000000000000003 /* ExerciseMediaDiag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaDiag.swift; sourceTree = "<group>"; };
+		E20000000000000000000004 /* ExerciseThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseThumbnailCache.swift; sourceTree = "<group>"; };
+		E20000000000000000000006 /* ExerciseMediaCacheVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseMediaCacheVersion.swift; sourceTree = "<group>"; };
+		E20000000000000000000005 /* ExerciseThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseThumbnailView.swift; sourceTree = "<group>"; };
+		E20000000000000000000002 /* ExerciseDemoGIFView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseDemoGIFView.swift; sourceTree = "<group>"; };
+		A20000000000000000000085 /* SyncFit.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = SyncFit.storekit; sourceTree = "<group>"; };
+		T10000000000000000000001 /* ProgramReplaceHistoryPreservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramReplaceHistoryPreservationTests.swift; sourceTree = "<group>"; };
 		T10000000000000000000002 /* SyncFitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SyncFitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		T10000000000000000000005 /* WorkoutSelectedDatePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSelectedDatePolicyTests.swift; sourceTree = "<group>"; };
+		T10000000000000000000006 /* AICoachChatMarkdownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICoachChatMarkdownTests.swift; sourceTree = "<group>"; };
+		T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachChatListenerLifecycleTests.swift; sourceTree = "<group>"; };
+		T12000000000000000000002 /* SavedMealManualMacrosTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedMealManualMacrosTests.swift; sourceTree = "<group>"; };
+		T13000000000000000000002 /* FoodLogAwaitingCloudTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodLogAwaitingCloudTests.swift; sourceTree = "<group>"; };
 		T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachCheckoutCallbackValidatorTests.swift; sourceTree = "<group>"; };
 		T1000000000000000000000B /* CoachCheckoutConfirmationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachCheckoutConfirmationTests.swift; sourceTree = "<group>"; };
-		E20000000000000000000008 /* DeleteAccountErrorMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountErrorMapper.swift; sourceTree = "<group>"; };
 		T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountErrorMapperTests.swift; sourceTree = "<group>"; };
-		T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachChatListenerLifecycleTests.swift; sourceTree = "<group>"; };
+		U20000000000000000000001 /* DeleteAccountManualFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountManualFlowUITests.swift; sourceTree = "<group>"; };
+		U20000000000000000000004 /* CoachStripeConnectOnboardingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachStripeConnectOnboardingUITests.swift; sourceTree = "<group>"; };
+		U20000000000000000000005 /* CoachMessagesListenerLifecycleUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachMessagesListenerLifecycleUITests.swift; sourceTree = "<group>"; };
+		U20000000000000000000002 /* SyncFitUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SyncFitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		T1000000000000000000000F /* CoachStripeOnboardingCallbackValidatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoachStripeOnboardingCallbackValidatorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -234,6 +260,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		U30000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -244,6 +277,7 @@
 				A20000000000000000000080 /* Secrets.xcconfig.example */,
 				A40000000000000000000002 /* SyncFit */,
 				T20000000000000000000001 /* SyncFitTests */,
+				U20000000000000000000003 /* SyncFitUITests */,
 				A40000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -271,6 +305,7 @@
 			children = (
 				A20000000000000000000017 /* SyncFit.app */,
 				T10000000000000000000002 /* SyncFitTests.xctest */,
+				U20000000000000000000002 /* SyncFitUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -296,10 +331,6 @@
 			children = (
 				A20000000000000000000005 /* FitnessDataStore.swift */,
 				A20000000000000000000019 /* SampleDataSeeder.swift */,
-				E20000000000000000000001 /* ExerciseMediaService.swift */,
-				E20000000000000000000003 /* ExerciseMediaDiag.swift */,
-				E20000000000000000000004 /* ExerciseThumbnailCache.swift */,
-				E20000000000000000000006 /* ExerciseMediaCacheVersion.swift */,
 				A20000000000000000000027 /* AIInsightService.swift */,
 				A20000000000000000000031 /* USDAFoodDataCentralService.swift */,
 				A20000000000000000000059 /* NutritionixService.swift */,
@@ -315,7 +346,12 @@
 				A2000000000000000000007E /* CoachPlaceholderContent.swift */,
 				A20000000000000000000079 /* CoachAuthCrypto.swift */,
 				A20000000000000000000084 /* SubscriptionManager.swift */,
+				E20000000000000000000007 /* CoachAIToolsService.swift */,
 				E20000000000000000000008 /* DeleteAccountErrorMapper.swift */,
+				E20000000000000000000001 /* ExerciseMediaService.swift */,
+				E20000000000000000000003 /* ExerciseMediaDiag.swift */,
+				E20000000000000000000004 /* ExerciseThumbnailCache.swift */,
+				E20000000000000000000006 /* ExerciseMediaCacheVersion.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -458,13 +494,28 @@
 		T20000000000000000000001 /* SyncFitTests */ = {
 			isa = PBXGroup;
 			children = (
+				T10000000000000000000001 /* ProgramReplaceHistoryPreservationTests.swift */,
+				T10000000000000000000005 /* WorkoutSelectedDatePolicyTests.swift */,
 				T10000000000000000000006 /* AICoachChatMarkdownTests.swift */,
+				T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */,
+				T12000000000000000000002 /* SavedMealManualMacrosTests.swift */,
+				T13000000000000000000002 /* FoodLogAwaitingCloudTests.swift */,
 				T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */,
 				T1000000000000000000000B /* CoachCheckoutConfirmationTests.swift */,
 				T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */,
-				T11000000000000000000002 /* CoachChatListenerLifecycleTests.swift */,
+				T1000000000000000000000F /* CoachStripeOnboardingCallbackValidatorTests.swift */,
 			);
 			path = SyncFitTests;
+			sourceTree = "<group>";
+		};
+		U20000000000000000000003 /* SyncFitUITests */ = {
+			isa = PBXGroup;
+			children = (
+				U20000000000000000000001 /* DeleteAccountManualFlowUITests.swift */,
+				U20000000000000000000004 /* CoachStripeConnectOnboardingUITests.swift */,
+				U20000000000000000000005 /* CoachMessagesListenerLifecycleUITests.swift */,
+			);
+			path = SyncFitUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -516,6 +567,26 @@
 			productReference = T10000000000000000000002 /* SyncFitTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		U40000000000000000000001 /* SyncFitUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = U70000000000000000000001 /* Build configuration list for PBXNativeTarget "SyncFitUITests" */;
+			buildPhases = (
+				U30000000000000000000001 /* Sources */,
+				U30000000000000000000002 /* Frameworks */,
+				U30000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				U50000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = SyncFitUITests;
+			packageProductDependencies = (
+			);
+			productName = SyncFitUITests;
+			productReference = U20000000000000000000002 /* SyncFitUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -530,6 +601,10 @@
 						CreatedOnToolsVersion = 15.0;
 					};
 					T40000000000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = A50000000000000000000001;
+					};
+					U40000000000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
 						TestTargetID = A50000000000000000000001;
 					};
@@ -554,6 +629,7 @@
 			targets = (
 				A50000000000000000000001 /* SyncFit */,
 				T40000000000000000000001 /* SyncFitTests */,
+				U40000000000000000000001 /* SyncFitUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -569,6 +645,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		T30000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		U30000000000000000000003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -616,12 +699,6 @@
 				A10000000000000000000015 /* SettingsView.swift in Sources */,
 				A10000000000000000000017 /* FitnessModels.swift in Sources */,
 				A10000000000000000000018 /* SampleDataSeeder.swift in Sources */,
-				E10000000000000000000001 /* ExerciseMediaService.swift in Sources */,
-				E10000000000000000000003 /* ExerciseMediaDiag.swift in Sources */,
-				E10000000000000000000004 /* ExerciseThumbnailCache.swift in Sources */,
-				E10000000000000000000006 /* ExerciseMediaCacheVersion.swift in Sources */,
-				E10000000000000000000005 /* ExerciseThumbnailView.swift in Sources */,
-				E10000000000000000000002 /* ExerciseDemoGIFView.swift in Sources */,
 				A10000000000000000000019 /* ExerciseLibrary.swift in Sources */,
 				A10000000000000000000020 /* NutritionSheets.swift in Sources */,
 				A10000000000000000000067 /* MacroSummaryViews.swift in Sources */,
@@ -647,7 +724,12 @@
 				A10000000000000000000040 /* AppleHealthSettingsSection.swift in Sources */,
 				A10000000000000000000041 /* AuthenticationManager.swift in Sources */,
 				A10000000000000000000084 /* SubscriptionManager.swift in Sources */,
-				E10000000000000000000008 /* DeleteAccountErrorMapper.swift in Sources */,
+				E10000000000000000000001 /* ExerciseMediaService.swift in Sources */,
+				E10000000000000000000003 /* ExerciseMediaDiag.swift in Sources */,
+				E10000000000000000000004 /* ExerciseThumbnailCache.swift in Sources */,
+				E10000000000000000000006 /* ExerciseMediaCacheVersion.swift in Sources */,
+				E10000000000000000000005 /* ExerciseThumbnailView.swift in Sources */,
+				E10000000000000000000002 /* ExerciseDemoGIFView.swift in Sources */,
 				A10000000000000000000042 /* FirestoreDatabaseManager.swift in Sources */,
 				A10000000000000000000047 /* FirebaseConfiguration.swift in Sources */,
 				A10000000000000000000050 /* SignInWithAppleButton.swift in Sources */,
@@ -667,6 +749,8 @@
 				A10000000000000000000064 /* ExerciseMaxWeight.swift in Sources */,
 				A10000000000000000000071 /* CoachModels.swift in Sources */,
 				A10000000000000000000072 /* CoachService.swift in Sources */,
+				E10000000000000000000007 /* CoachAIToolsService.swift in Sources */,
+				E10000000000000000000008 /* DeleteAccountErrorMapper.swift in Sources */,
 				A10000000000000000000073 /* CoachProfileScreen.swift in Sources */,
 				A10000000000000000000074 /* CoachLoginView.swift in Sources */,
 				A10000000000000000000075 /* CoachMainTabView.swift in Sources */,
@@ -688,11 +772,26 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				T10000000000000000000003 /* ProgramReplaceHistoryPreservationTests.swift in Sources */,
+				T10000000000000000000004 /* WorkoutSelectedDatePolicyTests.swift in Sources */,
 				T10000000000000000000007 /* AICoachChatMarkdownTests.swift in Sources */,
+				T11000000000000000000001 /* CoachChatListenerLifecycleTests.swift in Sources */,
+				T12000000000000000000001 /* SavedMealManualMacrosTests.swift in Sources */,
+				T13000000000000000000001 /* FoodLogAwaitingCloudTests.swift in Sources */,
 				T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */,
 				T1000000000000000000000A /* CoachCheckoutConfirmationTests.swift in Sources */,
 				T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */,
-				T11000000000000000000001 /* CoachChatListenerLifecycleTests.swift in Sources */,
+				T1000000000000000000000E /* CoachStripeOnboardingCallbackValidatorTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		U30000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				U10000000000000000000001 /* DeleteAccountManualFlowUITests.swift in Sources */,
+				U10000000000000000000002 /* CoachStripeConnectOnboardingUITests.swift in Sources */,
+				U10000000000000000000003 /* CoachMessagesListenerLifecycleUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -703,6 +802,11 @@
 			isa = PBXTargetDependency;
 			target = A50000000000000000000001 /* SyncFit */;
 			targetProxy = T50000000000000000000002 /* PBXContainerItemProxy */;
+		};
+		U50000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A50000000000000000000001 /* SyncFit */;
+			targetProxy = U50000000000000000000002 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -818,9 +922,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SyncFit/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SyncFit;
+				INFOPLIST_KEY_NSCameraUsageDescription = "SyncFit uses the camera to scan food barcodes and capture progress photos.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "SyncFit reads workouts, nutrition, weight, steps, and active energy from Apple Health to keep your dashboard complete.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "SyncFit saves your logged workouts, meals, and weight to Apple Health.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "SyncFit uses the camera to scan food barcodes and capture progress photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SyncFit uses your photo library to select progress photos stored privately in the app.";
 				INFOPLIST_KEY_NUTRITIONIX_APP_ID = "";
 				INFOPLIST_KEY_NUTRITIONIX_APP_KEY = "";
@@ -861,9 +965,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SyncFit/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = SyncFit;
+				INFOPLIST_KEY_NSCameraUsageDescription = "SyncFit uses the camera to scan food barcodes and capture progress photos.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "SyncFit reads workouts, nutrition, weight, steps, and active energy from Apple Health to keep your dashboard complete.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "SyncFit saves your logged workouts, meals, and weight to Apple Health.";
-				INFOPLIST_KEY_NSCameraUsageDescription = "SyncFit uses the camera to scan food barcodes and capture progress photos.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "SyncFit uses your photo library to select progress photos stored privately in the app.";
 				INFOPLIST_KEY_NUTRITIONIX_APP_ID = "";
 				INFOPLIST_KEY_NUTRITIONIX_APP_KEY = "";
@@ -933,6 +1037,42 @@
 			};
 			name = Release;
 		};
+		U60000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2DMDU95WTV;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.syncfit.SyncFitUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SyncFit;
+			};
+			name = Debug;
+		};
+		U60000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2DMDU95WTV;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.syncfit.SyncFitUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SyncFit;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -959,6 +1099,15 @@
 			buildConfigurations = (
 				T60000000000000000000001 /* Debug */,
 				T60000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		U70000000000000000000001 /* Build configuration list for PBXNativeTarget "SyncFitUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				U60000000000000000000001 /* Debug */,
+				U60000000000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

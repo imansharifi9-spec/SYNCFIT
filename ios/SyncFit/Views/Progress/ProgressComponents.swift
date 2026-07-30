@@ -226,6 +226,12 @@ struct ProgressStrengthCard: View {
                         .font(.system(size: 12))
                         .foregroundStyle(ProgressStyle.muted)
                         .frame(maxWidth: .infinity, minHeight: 70, alignment: .center)
+                } else if chart.showsTrendHint || chart.points.count < 2 {
+                    // Single real session (or no plottable trend) — no fake second point.
+                    Text("Log more sessions to see your trend")
+                        .font(.system(size: 12))
+                        .foregroundStyle(ProgressStyle.muted)
+                        .frame(maxWidth: .infinity, minHeight: 70, alignment: .center)
                 } else {
                     StrengthAreaChart(points: chart.points)
                         .frame(height: 70)
@@ -243,13 +249,6 @@ struct ProgressStrengthCard: View {
                                 .foregroundStyle(ProgressStyle.accentGreen)
                         }
                     }
-
-                    if chart.showsTrendHint {
-                        Text("Log more sessions to see your trend")
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundStyle(ProgressStyle.muted)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    }
                 }
             }
         }
@@ -258,6 +257,13 @@ struct ProgressStrengthCard: View {
 
 private struct StrengthAreaChart: View {
     let points: [StrengthChartPoint]
+
+    /// Catmull-Rom collapses to a lone point when Y is flat; linear always
+    /// draws a proper horizontal segment for "no change" trends.
+    private var isFlat: Bool {
+        guard let first = points.first?.maxWeight else { return true }
+        return points.allSatisfy { abs($0.maxWeight - first) < 0.001 }
+    }
 
     private var yDomain: ClosedRange<Double> {
         let values = points.map(\.maxWeight)
@@ -288,7 +294,7 @@ private struct StrengthAreaChart: View {
                         endPoint: .bottom
                     )
                 )
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(isFlat ? .linear : .catmullRom)
 
                 LineMark(
                     x: .value("Session", point.sessionIndex),
@@ -296,10 +302,20 @@ private struct StrengthAreaChart: View {
                 )
                 .foregroundStyle(ProgressStyle.accentGreen)
                 .lineStyle(StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(isFlat ? .linear : .catmullRom)
             }
 
-            if let last = points.last {
+            // Endpoints stay visible on flat trends (not just the last point).
+            if isFlat {
+                ForEach(points) { point in
+                    PointMark(
+                        x: .value("Session", point.sessionIndex),
+                        y: .value("Weight", point.maxWeight)
+                    )
+                    .foregroundStyle(ProgressStyle.accentGreen)
+                    .symbolSize(point.isMostRecent ? 64 : 36)
+                }
+            } else if let last = points.last {
                 PointMark(
                     x: .value("Session", last.sessionIndex),
                     y: .value("Weight", last.maxWeight)
@@ -338,32 +354,64 @@ struct ProgressPersonalRecordsCard: View {
                         .foregroundStyle(ProgressStyle.muted)
                 } else {
                     ForEach(records) { record in
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(record.exerciseName)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-                                Text(ProgressAnalytics.prSetDateLabel(record.prDate))
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(ProgressStyle.prDateMuted)
-                            }
-                            Spacer(minLength: 8)
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("\(SyncFitFormat.decimal(record.prWeight)) lbs")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(.white)
-                                Text(record.deltaText)
-                                    .font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(
-                                        record.deltaUsesAccentGreen
-                                            ? ProgressStyle.accentGreen
-                                            : ProgressStyle.muted
-                                    )
-                            }
-                        }
+                        ProgressPRRowView(record: record, compact: true)
                     }
                 }
+            }
+        }
+    }
+}
+
+private struct ProgressPRRowView: View {
+    let record: ExercisePRRow
+    var compact: Bool = false
+
+    private var group: String {
+        Exercise.resolvePrimaryMuscleGroup(
+            name: record.exerciseName,
+            catalogGroup: record.muscleGroup
+        )
+    }
+
+    private var accent: Color { record.categoryAccent }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: compact ? 8 : 10) {
+            // Same muscle-group palette as Workouts exercise icons.
+            ZStack {
+                RoundedRectangle(cornerRadius: compact ? 7 : 8, style: .continuous)
+                    .fill(accent.opacity(0.18))
+                Image(systemName: MuscleGroupArt.systemIcon(for: group))
+                    .font(.system(size: compact ? 10 : 12, weight: .semibold))
+                    .foregroundStyle(accent)
+            }
+            .frame(width: compact ? 28 : 32, height: compact ? 28 : 32)
+            .overlay {
+                RoundedRectangle(cornerRadius: compact ? 7 : 8, style: .continuous)
+                    .strokeBorder(accent.opacity(0.35), lineWidth: 1)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(record.exerciseName)
+                    .font(.system(size: compact ? 11 : 13, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .lineLimit(1)
+                Text(ProgressAnalytics.prSetDateLabel(record.prDate))
+                    .font(.system(size: compact ? 10 : 11, weight: .medium))
+                    .foregroundStyle(ProgressStyle.prDateMuted)
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(SyncFitFormat.decimal(record.prWeight)) lbs")
+                    .font(.system(size: compact ? 11 : 13, weight: .bold))
+                    .foregroundStyle(.white)
+                Text(record.deltaText)
+                    .font(.system(size: compact ? 9 : 11, weight: .medium))
+                    .foregroundStyle(
+                        record.deltaUsesAccentGreen
+                            ? ProgressStyle.accentGreen
+                            : ProgressStyle.muted
+                    )
             }
         }
     }
@@ -498,12 +546,24 @@ struct ProgressPhotosCard: View {
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
             Task {
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
+                do {
+                    guard let data = try await item.loadTransferable(type: Data.self) else {
+                        print("[ProgressPhoto] PhotosPicker returned nil data")
+                        await MainActor.run { pickerItem = nil }
+                        return
+                    }
+                    guard let image = UIImage(data: data) else {
+                        print("[ProgressPhoto] PhotosPicker data was not a valid image (\(data.count) bytes)")
+                        await MainActor.run { pickerItem = nil }
+                        return
+                    }
                     await MainActor.run {
                         savePhoto(image)
                         pickerItem = nil
                     }
+                } catch {
+                    print("[ProgressPhoto] PhotosPicker load FAILED: \(error)")
+                    await MainActor.run { pickerItem = nil }
                 }
             }
         }
@@ -515,7 +575,11 @@ struct ProgressPhotosCard: View {
     }
 
     private func savePhoto(_ image: UIImage) {
-        try? dataStore.addProgressPhoto(image, date: .now)
+        do {
+            try dataStore.addProgressPhoto(image, date: .now)
+        } catch {
+            print("[ProgressPhoto] Local save FAILED: \(error)")
+        }
     }
 }
 
@@ -527,17 +591,24 @@ struct ProgressPhotoDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
+    @State private var loadedImage: UIImage?
 
     var body: some View {
         NavigationStack {
             ZStack {
                 ProgressStyle.pageBackground.ignoresSafeArea()
-                if let image = ProgressPhotoStorage.loadImage(fileName: photo.fileName, userId: photo.userId) {
+                if let image = loadedImage {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
                         .padding()
+                } else {
+                    ProgressView()
+                        .tint(.white)
                 }
+            }
+            .task(id: photo.id) {
+                loadedImage = await ProgressPhotoStorage.loadImage(for: photo)
             }
             .navigationTitle(photo.date.formatted(date: .abbreviated, time: .omitted))
             .navigationBarTitleDisplayMode(.inline)
@@ -576,24 +647,31 @@ private struct ProgressPhotoSlot: View {
     let photo: ProgressPhotoEntry
     let dateLabel: String
     let slotHeight: CGFloat
+    @State private var loadedImage: UIImage?
 
     var body: some View {
         VStack(spacing: 4) {
-            if let image = ProgressPhotoStorage.loadImage(fileName: photo.fileName, userId: photo.userId) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: slotHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            } else {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(ProgressStyle.track)
-                    .frame(height: slotHeight)
+            Group {
+                if let image = loadedImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(ProgressStyle.track)
+                        .overlay { ProgressView().tint(.white) }
+                }
             }
+            .frame(height: slotHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
             Text(dateLabel)
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(ProgressStyle.muted)
                 .lineLimit(1)
+        }
+        .task(id: photo.id) {
+            loadedImage = await ProgressPhotoStorage.loadImage(for: photo)
         }
     }
 }
@@ -702,29 +780,7 @@ struct AllPRsListView: View {
                         .foregroundStyle(ProgressStyle.muted)
                 } else {
                     ForEach(records) { record in
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(record.exerciseName)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                Text(ProgressAnalytics.prSetDateLabel(record.prDate))
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(ProgressStyle.prDateMuted)
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("\(SyncFitFormat.decimal(record.prWeight)) lbs")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.white)
-                                Text(record.deltaText)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(
-                                        record.deltaUsesAccentGreen
-                                            ? ProgressStyle.accentGreen
-                                            : ProgressStyle.muted
-                                    )
-                            }
-                        }
+                        ProgressPRRowView(record: record, compact: false)
                         .padding(.vertical, 2)
                         .listRowBackground(ProgressStyle.pageBackground)
                     }
@@ -763,16 +819,7 @@ struct ProgressPhotoGalleryView: View {
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(sorted) { photo in
                         VStack(spacing: 4) {
-                            if let image = ProgressPhotoStorage.loadImage(
-                                fileName: photo.fileName,
-                                userId: photo.userId
-                            ) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(height: 110)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            }
+                            ProgressPhotoAsyncThumb(photo: photo, height: 110)
                             Text(photo.date.formatted(date: .abbreviated, time: .omitted))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -858,19 +905,40 @@ struct ProgressPhotoComparisonView: View {
 
     @ViewBuilder
     private func comparisonImage(for id: UUID?) -> some View {
-        if let id, let photo = sorted.first(where: { $0.id == id }),
-           let image = ProgressPhotoStorage.loadImage(fileName: photo.fileName, userId: photo.userId) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
+        if let id, let photo = sorted.first(where: { $0.id == id }) {
+            ProgressPhotoAsyncThumb(photo: photo, height: 280)
                 .frame(maxWidth: .infinity)
-                .frame(height: 280)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         } else {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(ProgressStyle.track)
                 .frame(maxWidth: .infinity)
                 .frame(height: 280)
+        }
+    }
+}
+
+private struct ProgressPhotoAsyncThumb: View {
+    let photo: ProgressPhotoEntry
+    var height: CGFloat = 110
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(ProgressStyle.track)
+                    .overlay { ProgressView().tint(.white) }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .task(id: photo.id) {
+            image = await ProgressPhotoStorage.loadImage(for: photo)
         }
     }
 }
