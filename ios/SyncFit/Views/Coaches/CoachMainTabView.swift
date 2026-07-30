@@ -685,11 +685,7 @@ struct CoachMessagesTab: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Full-bleed page color — empty VStack alone leaves NavigationStack's
-                // default gray content column visible as a center strip.
-                CoachUIColor.page.ignoresSafeArea()
-
+            Group {
                 if chatService.conversations.isEmpty {
                     VStack {
                         Spacer()
@@ -700,44 +696,28 @@ struct CoachMessagesTab: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(chatService.conversations) { conversation in
-                        Button {
-                            selectedConversation = conversation
-                        } label: {
-                            HStack(alignment: .top, spacing: 8) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text(conversation.userName)
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(.white)
-                                        Spacer()
-                                        Text(conversation.lastMessageAt.formatted(date: .omitted, time: .shortened))
-                                            .font(.system(size: 9))
-                                            .foregroundStyle(CoachUIColor.muted)
-                                    }
-                                    Text(conversation.lastMessage)
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(CoachUIColor.muted)
-                                        .lineLimit(1)
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(chatService.conversations) { conversation in
+                                Button {
+                                    selectedConversation = conversation
+                                } label: {
+                                    CoachConversationRowView(
+                                        conversation: conversation,
+                                        coachParticipantId: coachParticipantId
+                                    )
                                 }
-
-                                if !coachParticipantId.isEmpty,
-                                   conversation.isUnread(for: coachParticipantId) {
-                                    UnreadDotBadge(size: 8, offset: .zero)
-                                        .padding(.top, 4)
-                                }
+                                .buttonStyle(.plain)
                             }
                         }
-                        .buttonStyle(.plain)
-                        .listRowBackground(CoachUIColor.card)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                 }
             }
-            .toolbarBackground(CoachUIColor.page, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .background(CoachUIColor.page)
             .navigationTitle("Messages")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(item: $selectedConversation) { conversation in
                 CoachChatView(
                     conversationId: conversation.id,
@@ -760,6 +740,78 @@ struct CoachMessagesTab: View {
                 chatService.observeConversations(forParticipant: participant)
             }
         }
+    }
+}
+
+/// Premium conversation row: client avatar, typographic hierarchy, unread treatment.
+private struct CoachConversationRowView: View {
+    let conversation: ChatConversation
+    let coachParticipantId: String
+
+    private var isUnread: Bool {
+        !coachParticipantId.isEmpty && conversation.isUnread(for: coachParticipantId)
+    }
+
+    private var displayName: String {
+        let trimmed = conversation.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Client" : trimmed
+    }
+
+    private var previewText: String {
+        let trimmed = conversation.lastMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "No messages yet" : trimmed
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ClientProfileAvatarView(
+                clientUserID: conversation.userId,
+                size: 44,
+                subscribeToUpdates: true
+            )
+            .unreadDotBadge(isVisible: isUnread, size: 9)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(displayName)
+                        .font(.system(size: 14, weight: isUnread ? .bold : .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    Text(conversation.lastMessageAt.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(CoachUIColor.muted)
+                }
+
+                Text(previewText)
+                    .font(.system(size: 12, weight: isUnread ? .medium : .regular))
+                    .foregroundStyle(isUnread ? Color.white.opacity(0.78) : CoachUIColor.muted)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(CoachUIColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: CoachUIColor.cardCornerRadius, style: .continuous)
+                .strokeBorder(
+                    isUnread ? CoachUIColor.accent.opacity(0.35) : CoachUIColor.border,
+                    lineWidth: 0.5
+                )
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: String {
+        var parts = [displayName, previewText]
+        if isUnread { parts.insert("Unread", at: 0) }
+        return parts.joined(separator: ", ")
     }
 }
 
