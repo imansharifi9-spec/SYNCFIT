@@ -23,6 +23,7 @@ struct CoachPortalProfile: Codable, Equatable {
     var availability: CoachAvailability
     var location: String
     var photoFileName: String?
+    var photoURL: String?
     var transformationPhotoFileNames: [String]
     var transformationPhotos: [CoachTransformationPhotoRecord]
     var testimonials: [CoachTestimonial]
@@ -39,6 +40,7 @@ struct CoachPortalProfile: Codable, Equatable {
         availability: CoachAvailability = .online,
         location: String = "",
         photoFileName: String? = nil,
+        photoURL: String? = nil,
         transformationPhotoFileNames: [String] = [],
         transformationPhotos: [CoachTransformationPhotoRecord] = [],
         testimonials: [CoachTestimonial] = [],
@@ -54,6 +56,7 @@ struct CoachPortalProfile: Codable, Equatable {
         self.availability = availability
         self.location = location
         self.photoFileName = photoFileName
+        self.photoURL = photoURL
         self.transformationPhotoFileNames = transformationPhotoFileNames
         self.transformationPhotos = transformationPhotos
         self.testimonials = testimonials
@@ -98,6 +101,7 @@ struct CoachPortalProfile: Codable, Equatable {
                 )
             },
             photoFileName: photoFileName,
+            photoURL: photoURL,
             transformationPhotoFileNames: resolvedTransformationFileNames,
             isLive: isLive && isComplete,
             isListed: isListed,
@@ -156,9 +160,13 @@ struct CoachClientConnection: Identifiable, Codable, Hashable {
         shareNutrition: Bool = false,
         shareProgress: Bool = false,
         status: CoachConnectionStatus = .active,
-        clientInitiatedContact: Bool = false
+        clientInitiatedContact: Bool = false,
+        documentID: String? = nil
     ) {
-        self.documentID = Self.makeDocumentID(clientUserID: clientUserID, coachFirestoreID: coachFirestoreID)
+        // Prefer the Firestore document id when decoding so we never rewrite
+        // an existing connection under a regenerated key.
+        self.documentID = documentID
+            ?? Self.makeDocumentID(clientUserID: clientUserID, coachFirestoreID: coachFirestoreID)
         self.coachID = coachID
         self.coachFirestoreID = coachFirestoreID
         self.coachName = coachName

@@ -592,16 +592,45 @@ final class FirestoreDatabaseManager: ObservableObject {
     /// Reads payment readiness from the server so a cached marketplace profile can
     /// never authorize a Checkout attempt.
     func fetchCoachStripeChargesEnabled(coachFirestoreID: String) async throws -> Bool {
+        try await fetchCoachStripeStatus(coachFirestoreID: coachFirestoreID).chargesEnabled
+    }
+
+    /// Server-only read of Connect readiness for `coaches/{uid}`.
+    func fetchCoachStripeStatus(coachFirestoreID: String) async throws -> CoachStripeStatus {
         guard let db else { throw FirestoreDatabaseError.firebaseUnavailable }
         let document = try await db.collection("coaches")
             .document(coachFirestoreID)
             .getDocument(source: .server)
-        return document.data()?["stripeChargesEnabled"] as? Bool ?? false
+        let data = document.data() ?? [:]
+        let accountId = (data["stripeConnectedAccountId"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let charges = data["stripeChargesEnabled"] as? Bool ?? false
+        // DEBUG: raw Firestore payload the client actually received from the server.
+        print(
+            "[StripeConnect] fetchCoachStripeStatus raw uid=\(coachFirestoreID) exists=\(document.exists) stripeChargesEnabled=\(String(describing: data["stripeChargesEnabled"])) chargesParsed=\(charges) accountId=\(accountId.isEmpty ? "nil" : accountId)"
+        )
+        return CoachStripeStatus(
+            chargesEnabled: charges,
+            hasConnectedAccount: !accountId.isEmpty
+        )
     }
 
     func observeCoachStripeChargesEnabled(
         coachFirestoreID: String,
         onChange: @escaping (Bool) -> Void,
+        onError: @escaping (Error) -> Void
+    ) -> ListenerRegistration? {
+        observeCoachStripeStatus(
+            coachFirestoreID: coachFirestoreID,
+            onChange: { status in onChange(status.chargesEnabled) },
+            onError: onError
+        )
+    }
+
+    /// Live Connect readiness for a coach document (`chargesEnabled` + connected account id).
+    func observeCoachStripeStatus(
+        coachFirestoreID: String,
+        onChange: @escaping (CoachStripeStatus) -> Void,
         onError: @escaping (Error) -> Void
     ) -> ListenerRegistration? {
         guard let db else { return nil }
@@ -611,7 +640,15 @@ final class FirestoreDatabaseManager: ObservableObject {
                     onError(error)
                     return
                 }
-                onChange(snapshot?.data()?["stripeChargesEnabled"] as? Bool ?? false)
+                let data = snapshot?.data() ?? [:]
+                let accountId = (data["stripeConnectedAccountId"] as? String)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                onChange(
+                    CoachStripeStatus(
+                        chargesEnabled: data["stripeChargesEnabled"] as? Bool ?? false,
+                        hasConnectedAccount: !accountId.isEmpty
+                    )
+                )
             }
     }
 
@@ -639,6 +676,34 @@ final class FirestoreDatabaseManager: ObservableObject {
                 if hasActiveMatch {
                     onActive()
                 }
+            }
+    }
+
+    /// Hire confirmation listens on the canonical paid connection document so the
+    /// UI only flips after the webhook writes `coach_clients/{sorted(client,coach)}`.
+    func observeActiveCoachClientConnection(
+        clientUserID: String,
+        coachFirestoreID: String,
+        onActive: @escaping () -> Void,
+        onError: @escaping (Error) -> Void
+    ) -> ListenerRegistration? {
+        guard let db else { return nil }
+        let documentID = CoachClientConnection.makeDocumentID(
+            clientUserID: clientUserID,
+            coachFirestoreID: coachFirestoreID
+        )
+        return db.collection("coach_clients").document(documentID)
+            .addSnapshotListener { snapshot, error in
+                if let error {
+                    onError(error)
+                    return
+                }
+                guard let data = snapshot?.data(),
+                      let status = data["status"] as? String,
+                      status == CoachConnectionStatus.active.rawValue else {
+                    return
+                }
+                onActive()
             }
     }
 

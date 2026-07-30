@@ -1,16 +1,93 @@
 import SwiftUI
+import PhotosUI
 import FirebaseAuth
 
 struct ProfileAvatarView: View {
     var size: CGFloat = 36
+    var userID: String = ""
+    var photoFileName: String?
+    var photoURL: String?
+
+    @State private var resolvedImage: UIImage?
 
     var body: some View {
-        Image(systemName: "person.crop.circle.fill")
-            .resizable()
-            .scaledToFit()
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(SyncFitTheme.accentBright, SyncFitTheme.accentDark.opacity(0.35))
-            .frame(width: size, height: size)
+        Group {
+            if let resolvedImage {
+                Image(uiImage: resolvedImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "person.crop.circle.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(SyncFitTheme.accentBright, SyncFitTheme.accentDark.opacity(0.35))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .task(id: "\(userID)|\(photoURL ?? "")|\(photoFileName ?? "")") {
+            guard !userID.isEmpty else {
+                resolvedImage = nil
+                return
+            }
+            resolvedImage = await UserPhotoStorage.loadProfileImage(
+                userID: userID,
+                fileName: photoFileName,
+                photoURL: photoURL
+            )
+        }
+    }
+}
+
+/// Client avatar for coach-facing surfaces. Pass inline photo fields when already
+/// available (e.g. live listener); otherwise set `subscribeToUpdates` to read
+/// `users/{clientUserID}` reactively.
+struct ClientProfileAvatarView: View {
+    let clientUserID: String
+    var photoFileName: String?
+    var photoURL: String?
+    var size: CGFloat = 40
+    var subscribeToUpdates: Bool = false
+
+    @EnvironmentObject private var firestore: FirestoreDatabaseManager
+    @State private var subscribedFileName: String?
+    @State private var subscribedURL: String?
+
+    private var resolvedFileName: String? { photoFileName ?? subscribedFileName }
+    private var resolvedURL: String? { photoURL ?? subscribedURL }
+
+    var body: some View {
+        ProfileAvatarView(
+            size: size,
+            userID: clientUserID,
+            photoFileName: resolvedFileName,
+            photoURL: resolvedURL
+        )
+        .task(id: subscriptionKey) {
+            guard subscribeToUpdates, firestore.isAvailable, !clientUserID.isEmpty else { return }
+            let registration = firestore.observeClientProfile(
+                clientUserID: clientUserID,
+                onChange: { profile in
+                    Task { @MainActor in
+                        subscribedFileName = profile.photoFileName
+                        subscribedURL = profile.photoURL
+                    }
+                }
+            )
+            defer { registration?.remove() }
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: 60_000_000_000)
+                } catch {
+                    break
+                }
+            }
+        }
+    }
+
+    private var subscriptionKey: String {
+        "\(clientUserID)|\(subscribeToUpdates)"
     }
 }
 
@@ -18,11 +95,18 @@ struct ProfileView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var dataStore: FitnessDataStore
     @EnvironmentObject private var coachService: CoachService
+    @EnvironmentObject private var chatService: CoachChatService
     @EnvironmentObject private var firestore: FirestoreDatabaseManager
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedCoachProfile: CoachProfile?
     @State private var activeChat: CoachChatRoute?
+    @State private var profilePickerItem: PhotosPickerItem?
+    @State private var showingProfilePhotoPicker = false
+
+    private var userAuthUID: String {
+        Auth.auth().currentUser?.uid ?? ""
+    }
 
     private var hiredCoach: CoachProfile? {
         guard let connection = coachService.clientCoachConnection, connection.isActive else { return nil }
@@ -44,6 +128,7 @@ struct ProfileView: View {
                             MyCoachCard(
                                 coach: coach,
                                 connection: connection,
+                                hasUnreadMessage: chatService.hasUnreadMessage(fromCoachId: coach.coachFirestoreID),
                                 onMessage: { openChat(with: coach, connection: connection) },
                                 onOpenProfile: { selectedCoachProfile = coach }
                             )
@@ -53,7 +138,7 @@ struct ProfileView: View {
 
                 SyncFitCard {
                     VStack(spacing: 14) {
-                        ProfileAvatarView(size: 72)
+                        profilePhotoSection
 
                         Text(displayName)
                             .font(.title2.bold())
@@ -111,6 +196,7 @@ struct ProfileView: View {
                                     .foregroundStyle(.tertiary)
                             }
                         }
+                        .accessibilityIdentifier("profileSettingsButton")
                     }
                 }
             }
@@ -137,6 +223,82 @@ struct ProfileView: View {
         .task {
             await coachService.refreshClientCoachConnection()
             await refreshProfileFromCloud()
+        }
+    }
+
+    private var profilePhotoSection: some View {
+        VStack(spacing: 8) {
+            Button {
+                showingProfilePhotoPicker = true
+            } label: {
+                ProfileAvatarView(
+                    size: 72,
+                    userID: userAuthUID,
+                    photoFileName: appState.profile.photoFileName,
+                    photoURL: appState.profile.photoURL
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(userAuthUID.isEmpty)
+
+            Text("Tap to upload photo")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .photosPicker(isPresented: $showingProfilePhotoPicker, selection: $profilePickerItem, matching: .images)
+        .onChange(of: profilePickerItem) { _, item in
+            guard let item else { return }
+            Task {
+                do {
+                    guard let data = try await item.loadTransferable(type: Data.self),
+                          let image = UIImage(data: data) else {
+                        #if DEBUG
+                        print("[UserPhoto] Picker produced no image data")
+                        #endif
+                        return
+                    }
+                    guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
+                        #if DEBUG
+                        print("[UserPhoto] Upload skipped — not signed in")
+                        #endif
+                        return
+                    }
+
+                    let fileName = UserPhotoStorage.profileFileName
+                    try UserPhotoStorage.saveJPEG(from: image, fileName: fileName, userID: uid)
+                    await MainActor.run {
+                        var updated = appState.profile
+                        updated.photoFileName = fileName
+                        appState.updateProfile(updated)
+                        profilePickerItem = nil
+                    }
+
+                    let downloadURL = try await UserPhotoStorage.uploadProfilePhoto(
+                        image: image,
+                        userAuthUID: uid
+                    )
+
+                    await MainActor.run {
+                        var updated = appState.profile
+                        updated.photoURL = downloadURL
+                        appState.updateProfile(updated)
+                    }
+
+                    try await firestore.saveUserProfile(
+                        appState.profile,
+                        hasCompletedOnboarding: appState.hasCompletedOnboarding
+                    )
+                    #if DEBUG
+                    print("[UserPhoto] Profile photo saved + synced photoURL")
+                    #endif
+                } catch {
+                    #if DEBUG
+                    print("[UserPhoto] Profile photo save FAILED: \(error)")
+                    #endif
+                    await MainActor.run { profilePickerItem = nil }
+                }
+            }
         }
     }
 
@@ -184,7 +346,7 @@ struct ProfileView: View {
     private var missionPercentText: String {
         let proteinTarget = max(appState.profile.proteinTarget, 1)
         let proteinProgress = min(Double(dataStore.todaysProtein) / Double(proteinTarget), 1)
-        let workoutProgress = dataStore.hasWorkoutToday ? 1.0 : 0.0
+        let workoutProgress = dataStore.workoutGoalMet(on: .now) ? 1.0 : 0.0
         let percent = Int((((proteinProgress + workoutProgress) / 2) * 100).rounded())
         return "\(percent)%"
     }

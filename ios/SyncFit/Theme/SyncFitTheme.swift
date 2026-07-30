@@ -14,6 +14,8 @@ enum SyncFitTheme {
     static let calorieOver = Color(red: 230 / 255, green: 180 / 255, blue: 80 / 255)
     static let background = Color(.systemGroupedBackground)
     static let card = Color(.secondarySystemGroupedBackground)
+    /// iMessage-style unread indicator (matches Home notification bell).
+    static let unreadDot = Color.red
 
     static let headlineFont = Font.system(.title2, design: .rounded).weight(.bold)
     static let bodyFont = Font.system(.body, design: .default)
@@ -22,6 +24,32 @@ enum SyncFitTheme {
 
     static func detailText(for colorScheme: ColorScheme) -> Color {
         colorScheme == .dark ? .white : Color(.secondaryLabel)
+    }
+}
+
+
+/// Small filled red circle — present/absent only (no count).
+struct UnreadDotBadge: View {
+    var size: CGFloat = 8
+    var offset: CGSize = CGSize(width: 3, height: -3)
+
+    var body: some View {
+        Circle()
+            .fill(SyncFitTheme.unreadDot)
+            .frame(width: size, height: size)
+            .offset(offset)
+            .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// Overlays an iMessage-style red unread dot at the top-trailing corner.
+    func unreadDotBadge(isVisible: Bool, size: CGFloat = 8) -> some View {
+        overlay(alignment: .topTrailing) {
+            if isVisible {
+                UnreadDotBadge(size: size)
+            }
+        }
     }
 }
 

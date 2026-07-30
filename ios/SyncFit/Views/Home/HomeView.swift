@@ -1,10 +1,13 @@
 import SwiftUI
 import FirebaseAuth
+import FirebaseFirestore
+import FirebaseFunctions
+import UIKit
 
 private enum HomePalette {
     static let pageBackground = Color(red: 13 / 255, green: 13 / 255, blue: 13 / 255)
-    static let consistencyGreen = Color(red: 92 / 255, green: 219 / 255, blue: 110 / 255)
-    static let missionGreen = Color(red: 92 / 255, green: 219 / 255, blue: 110 / 255)
+    static let consistencyGreen = SyncFitTheme.primaryAction
+    static let missionGreen = SyncFitTheme.primaryAction
     static let missionLabelGreen = Color(red: 74 / 255, green: 138 / 255, blue: 90 / 255)
     static let track = Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255)
     static let emptyCheckbox = Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255)
@@ -25,6 +28,7 @@ struct HomeView: View {
     @EnvironmentObject private var dataStore: FitnessDataStore
     @EnvironmentObject private var chatService: CoachChatService
     @EnvironmentObject private var coachService: CoachService
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var showingNotifications = false
@@ -82,9 +86,15 @@ struct HomeView: View {
                         NavigationLink {
                             ProfileView()
                         } label: {
-                            HomeProfileAvatar(name: firstName, size: 28)
+                            ProfileAvatarView(
+                                size: 28,
+                                userID: Auth.auth().currentUser?.uid ?? "",
+                                photoFileName: appState.profile.photoFileName,
+                                photoURL: appState.profile.photoURL
+                            )
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("homeProfileButton")
                     }
                 }
             }
@@ -248,9 +258,7 @@ struct HomeView: View {
     private var workoutMissionDetail: String {
         switch todayWorkoutState {
         case .completed:
-            let session = dataStore.todayWorkoutSessionName()
-                ?? dataStore.routine(for: .now)?.name
-                ?? dataStore.routineDisplayName(for: .now)
+            let session = dataStore.workoutDayDisplayTitle(for: .now)
             return "\(session) complete"
         case .inProgress:
             let done = dataStore.exercisesWithLoggedSetsCount(on: .now)
@@ -352,9 +360,7 @@ struct HomeView: View {
     }
 
     private var activeWorkoutCard: some View {
-        let sessionName = dataStore.todayWorkoutSessionName()
-            ?? dataStore.routine(for: .now)?.name
-            ?? dataStore.routineDisplayName(for: .now)
+        let sessionName = dataStore.workoutDayDisplayTitle(for: .now)
         let exerciseCount = dataStore.plannedExerciseCount(for: .now)
         let state = todayWorkoutState
         let statusLine = workoutStatusLine(state: state, exerciseCount: exerciseCount)
@@ -511,47 +517,78 @@ struct HomeView: View {
     // MARK: - SyncFit+
 
     private var syncFitPlusCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("✦ \(SyncFitPlusBrand.name)")
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(HomePalette.missionGreen)
-                .tracking(0.8)
+        let isSubscribed = subscriptionManager.isSubscribed
+        #if DEBUG
+        let showing = isSubscribed ? "AI Coach" : "upgrade CTA"
+        let _ = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            print(
+                "[HomeBanner] \(formatter.string(from: Date())) Rendering with " +
+                "isSubscribed=\(isSubscribed), showing: \(showing)"
+            )
+        }()
+        #endif
 
-            if appState.isSyncFitPlusSubscriber {
-                Text(primaryInsightMessage)
-                    .font(.system(size: 11))
-                    .foregroundStyle(HomePalette.hintMuted)
-                    .fixedSize(horizontal: false, vertical: true)
+        return Button {
+            if subscriptionManager.isSubscribed {
+                appState.presentAICoach()
             } else {
-                Text(SyncFitPlusBrand.freeUserPitch)
-                    .font(.system(size: 11))
-                    .foregroundStyle(HomePalette.hintMuted)
-                    .fixedSize(horizontal: false, vertical: true)
+                appState.presentSyncFitPlusUpgrade()
+            }
+        } label: {
+            HStack(spacing: 14) {
+                AICompanionOrbPreview()
+                    .frame(width: 78, height: 78)
 
-                Button {
-                    appState.presentSyncFitPlusUpgrade()
-                } label: {
-                    Text(SyncFitPlusBrand.unlockButton)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("✦ \(SyncFitPlusBrand.name)")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(HomePalette.missionGreen)
+                        .tracking(0.8)
+
+                    Text("Meet your AI Coach")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    Text(isSubscribed ? primaryInsightMessage : "Personal guidance from your actual workouts, meals, protein, and progress — not generic advice.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(HomePalette.hintMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(isSubscribed ? "Open AI Coach →" : SyncFitPlusBrand.unlockButton)
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(HomePalette.missionGreen)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(Color(red: 26 / 255, green: 58 / 255, blue: 26 / 255))
                         .clipShape(Capsule())
+                        .padding(.top, 2)
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 2)
+
+                Spacer(minLength: 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(HomePalette.aiCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(HomePalette.aiCardBorder, lineWidth: 0.5)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .background(
+            LinearGradient(
+                colors: [
+                    HomePalette.aiCardBackground,
+                    Color(red: 10 / 255, green: 34 / 255, blue: 18 / 255)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(HomePalette.missionGreen.opacity(0.22), lineWidth: 1)
+        )
+        .shadow(color: HomePalette.missionGreen.opacity(0.12), radius: 18, y: 8)
+        .buttonStyle(.plain)
     }
 
     private var primaryInsightMessage: String {
@@ -739,20 +776,6 @@ private struct HomeGhostWorkoutButtonStyle: ButtonStyle {
     }
 }
 
-private struct HomeProfileAvatar: View {
-    let name: String
-    let size: CGFloat
-
-    var body: some View {
-        Text(name.coachInitials)
-            .font(.system(size: size * 0.36, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(Color(red: 26 / 255, green: 58 / 255, blue: 26 / 255))
-            .clipShape(Circle())
-    }
-}
-
 private struct HomeCoachAvatar: View {
     let name: String
     let specialty: String
@@ -861,4 +884,795 @@ private struct HomeNotificationsSheet: View {
         .environmentObject(FitnessDataStore.preview())
         .environmentObject(CoachChatService())
         .environmentObject(CoachService(context: try! SyncFitModelContainer.make(inMemory: true).mainContext))
+}
+
+// MARK: - AI Coach
+
+private struct AICompanionMessage: Identifiable, Equatable {
+    enum Role: String {
+        case user
+        case assistant
+    }
+
+    let id: String
+    let role: Role
+    let text: String
+    let createdAt: Date
+
+    var isUser: Bool { role == .user }
+}
+
+@MainActor
+private final class AICompanionService: ObservableObject {
+    @Published private(set) var messages: [AICompanionMessage] = []
+    @Published private(set) var isSending = false
+    @Published private(set) var orbActivity: AICoachOrbActivity = .idle
+    @Published var errorMessage: String?
+
+    private let functions = Functions.functions()
+    private var listener: ListenerRegistration?
+    private var activeConversationId: String?
+
+    func start(conversationId: String = "primary") {
+        stop()
+        activeConversationId = conversationId
+
+        guard FirebaseConfiguration.isConfigured else {
+            errorMessage = "Firebase is not configured."
+            return
+        }
+        guard let uid = Auth.auth().currentUser?.uid else {
+            errorMessage = "Sign in required."
+            return
+        }
+
+        listener = Firestore.firestore()
+            .collection("users")
+            .document(uid)
+            .collection("aiCompanionConversations")
+            .document(conversationId)
+            .collection("messages")
+            .order(by: "createdAt")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self else { return }
+                Task { @MainActor in
+                    if let error {
+                        self.errorMessage = error.localizedDescription
+                        #if DEBUG
+                        print("[AICompanion] message listen failed: \(error)")
+                        #endif
+                        return
+                    }
+                    self.messages = (snapshot?.documents ?? []).compactMap(Self.parseMessage)
+                }
+            }
+    }
+
+    func stop() {
+        listener?.remove()
+        listener = nil
+        activeConversationId = nil
+        messages = []
+        errorMessage = nil
+        orbActivity = .idle
+    }
+
+    func send(_ text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard Auth.auth().currentUser != nil else {
+            errorMessage = "Sign in required."
+            return
+        }
+
+        let conversationId = activeConversationId ?? "primary"
+        isSending = true
+        errorMessage = nil
+        orbActivity = .thinking
+
+        do {
+            _ = try await functions
+                .httpsCallable("aiCompanionChat")
+                .call([
+                    "conversationId": conversationId,
+                    "message": trimmed
+                ])
+            isSending = false
+            // A short, energetic answer-arrived beat; visual impact lives in the orb.
+            orbActivity = .responding
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            if orbActivity == .responding {
+                orbActivity = .idle
+            }
+        } catch {
+            isSending = false
+            orbActivity = .idle
+            errorMessage = (error as NSError).localizedDescription
+            #if DEBUG
+            print("[AICompanion] send failed: \(error)")
+            #endif
+        }
+    }
+
+    private static func parseMessage(_ document: QueryDocumentSnapshot) -> AICompanionMessage? {
+        let data = document.data()
+        guard let text = data["text"] as? String, !text.isEmpty else { return nil }
+        let roleRaw = (data["role"] as? String) ?? "assistant"
+        let role = AICompanionMessage.Role(rawValue: roleRaw) ?? .assistant
+        let timestamp = (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+        return AICompanionMessage(
+            id: document.documentID,
+            role: role,
+            text: text,
+            createdAt: timestamp
+        )
+    }
+}
+
+private enum AICompanionPalette {
+    static let background = Color(red: 7 / 255, green: 10 / 255, blue: 8 / 255)
+    static let card = Color(red: 14 / 255, green: 20 / 255, blue: 16 / 255)
+    static let field = Color(red: 21 / 255, green: 28 / 255, blue: 23 / 255)
+    static let accent = Color(red: 92 / 255, green: 219 / 255, blue: 110 / 255)
+    static let muted = Color(red: 145 / 255, green: 154 / 255, blue: 148 / 255)
+}
+
+/// Parses Claude Markdown for AI Coach assistant bubbles (headers, bold, lists).
+enum AICoachChatMarkdown {
+    /// Expands single newlines into paragraph breaks so CommonMark doesn't collapse
+    /// Claude's "header\\nparagraph" into one dense run of text.
+    static func normalizeParagraphBreaks(_ text: String) -> String {
+        var normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+
+        // Protect existing blank lines, then promote every remaining single newline
+        // to a blank line. Already-double newlines stay as a single paragraph break.
+        let placeholder = "\u{FFFC}"
+        normalized = normalized.replacingOccurrences(of: "\n\n", with: placeholder)
+        normalized = normalized.replacingOccurrences(of: "\n", with: "\n\n")
+        normalized = normalized.replacingOccurrences(of: placeholder, with: "\n\n")
+
+        // Collapse accidental 3+ blank lines down to one paragraph break.
+        while normalized.contains("\n\n\n") {
+            normalized = normalized.replacingOccurrences(of: "\n\n\n", with: "\n\n")
+        }
+        return normalized
+    }
+
+    /// Paragraph/section blocks after spacing normalization — rendered with explicit
+    /// VStack spacing so sections never visually glue together.
+    static func blocks(from text: String) -> [String] {
+        normalizeParagraphBreaks(text)
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    static func attributedString(from text: String, normalize: Bool = true) -> AttributedString {
+        let markdown = normalize ? normalizeParagraphBreaks(text) : text
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
+        if let parsed = try? AttributedString(markdown: markdown, options: options) {
+            return parsed
+        }
+        return AttributedString(markdown)
+    }
+
+    /// Renders one block from `blocks(from:)` — handles bullet lines split out of list
+    /// context so `**bold**` still parses (standalone `- **text**` does not).
+    static func attributedBlock(from block: String) -> AttributedString {
+        let trimmed = block.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("- ") {
+            var body = attributedString(from: String(trimmed.dropFirst(2)), normalize: false)
+            var bullet = AttributedString("• ")
+            bullet.append(body)
+            return bullet
+        }
+        if trimmed.hasPrefix("• ") {
+            var body = attributedString(from: String(trimmed.dropFirst(2)), normalize: false)
+            var bullet = AttributedString("• ")
+            bullet.append(body)
+            return bullet
+        }
+        return attributedString(from: block, normalize: false)
+    }
+}
+
+/// Activity-driven motion for the shared AI Coach orb (Home banner + full-screen).
+enum AICoachOrbActivity: Equatable {
+    case idle
+    case thinking
+    case responding
+}
+
+/// Home-banner sized AI Coach orb. Thin wrapper over the shared `AICoachOrb` so the
+/// banner and the full-screen header can never drift apart — same rendering, different size.
+private struct AICompanionOrbPreview: View {
+    var body: some View {
+        AICoachOrb(size: 78, activity: .idle)
+    }
+}
+
+/// Holographic HUD-style AI Coach core — flat/graphic rings + bright core (not a 3D sphere).
+/// Shared across Home banner and full-screen; `activity` only remaps motion rates.
+private struct AICoachOrb: View {
+    var size: CGFloat
+    /// Soft ambient glow behind the HUD (full-screen header).
+    var showsAmbient: Bool = false
+    var activity: AICoachOrbActivity = .idle
+
+    private var accent: Color { AICompanionPalette.accent }
+
+    /// Smoothed motion — animated toward targets when `activity` changes.
+    @State private var ringSpeed: Double = 0.35
+    @State private var scanSpeed: Double = 0.55
+    @State private var pulseRate: Double = 1.1
+    @State private var pulseAmp: Double = 0.04
+    @State private var coreGlow: Double = 0.85
+    @State private var scanIntensity: Double = 0.55
+    /// 1 while thinking so rings expand/contract with the core; 0 otherwise.
+    @State private var ringPulseBlend: Double = 0.0
+    /// Phase offsets so speed changes don't jump the ring/scan angles.
+    @State private var ringPhase: Double = 0
+    @State private var scanPhase: Double = 0
+    /// Timestamp for the one-shot flare and scale bump when an answer arrives.
+    @State private var respondingImpactStart: TimeInterval?
+
+    var body: some View {
+        TimelineView(.animation) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            let pulse = corePulse(at: t)
+            // During thinking, rings share the pulse so the HUD expands/contracts as a unit.
+            let ringScale = 1 + (pulse - 1) * ringPulseBlend
+            let liveGlow = thinkingGlow(at: t, base: coreGlow)
+            let responseImpact = respondingImpact(at: t)
+
+            ZStack {
+                if showsAmbient { ambient }
+
+                // Soft even bloom — brightens/dims with thinking pulse.
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                accent.opacity(0.28 * liveGlow),
+                                accent.opacity(0.08 * liveGlow),
+                                .clear
+                            ],
+                            center: .center,
+                            startRadius: size * 0.02,
+                            endRadius: size * 0.48
+                        )
+                    )
+                    .frame(width: size * 0.95, height: size * 0.95)
+                    .blur(radius: size * 0.04)
+                    .scaleEffect(ringScale)
+
+                ZStack {
+                    // Outer thin full ring (slow CW)
+                    hudRing(diameter: size * 0.92, lineWidth: max(0.8, size * 0.008), opacity: 0.35)
+                        .rotationEffect(.degrees(t * ringSpeed * 28 + ringPhase))
+
+                    // Tick marks on mid-outer ring (CCW)
+                    tickRing(diameter: size * 0.78, tickCount: 24)
+                        .rotationEffect(.degrees(-t * ringSpeed * 42 - ringPhase * (42.0 / 28.0)))
+
+                    // Segmented arc ring (CW, faster)
+                    segmentedRing(
+                        diameter: size * 0.64,
+                        segments: 5,
+                        span: 0.11,
+                        gap: 0.09,
+                        lineWidth: max(1.0, size * 0.012),
+                        opacity: 0.75
+                    )
+                    .rotationEffect(.degrees(t * ringSpeed * 70 + ringPhase * (70.0 / 28.0)))
+
+                    // Inner continuous ring (CCW)
+                    hudRing(diameter: size * 0.46, lineWidth: max(0.7, size * 0.007), opacity: 0.45)
+                        .rotationEffect(.degrees(-t * ringSpeed * 55 - ringPhase * (55.0 / 28.0)))
+
+                    // Inner segmented micro-arcs (CW)
+                    segmentedRing(
+                        diameter: size * 0.34,
+                        segments: 3,
+                        span: 0.14,
+                        gap: 0.19,
+                        lineWidth: max(0.9, size * 0.01),
+                        opacity: 0.55
+                    )
+                    .rotationEffect(.degrees(t * ringSpeed * 95 + ringPhase * (95.0 / 28.0)))
+
+                    // Radar / scan sweep on the mid ring
+                    scanSweep(diameter: size * 0.64, at: t, phase: scanPhase)
+                        .opacity(scanIntensity)
+                }
+                .scaleEffect(ringScale)
+
+                // Central glowing core — small bright disc, not a large lit ball.
+                coreDisc(pulse: pulse, glow: liveGlow, responseImpact: responseImpact)
+            }
+            .frame(width: size, height: size)
+            .scaleEffect(1 + responseImpact * 0.055)
+        }
+        .frame(width: size, height: size)
+        .onAppear { applyMotion(for: activity, animated: false) }
+        .onChange(of: activity) { _, newValue in
+            applyMotion(for: newValue, animated: true)
+        }
+    }
+
+    private func corePulse(at t: TimeInterval) -> Double {
+        switch activity {
+        case .idle:
+            return 1 + sin(t * pulseRate) * abs(sin(t * pulseRate)) * pulseAmp
+        case .thinking:
+            // Calm, steady expand/contract — primary motion while working.
+            return 1 + sin(t * pulseRate) * pulseAmp
+        case .responding:
+            let wave = sin(t * pulseRate) + 0.4 * sin(t * pulseRate * 2.0)
+            return 1 + wave * pulseAmp
+        }
+    }
+
+    /// Brighten/dim locked to the thinking pulse; idle/responding keep a steady glow.
+    private func thinkingGlow(at t: TimeInterval, base: Double) -> Double {
+        guard activity == .thinking else { return base }
+        let unit = 0.5 + 0.5 * sin(t * pulseRate) // 0...1
+        return base * (0.72 + 0.38 * unit)
+    }
+
+    /// Fast attack and smooth decay for the answer-arrived flash/pop.
+    private func respondingImpact(at t: TimeInterval) -> Double {
+        guard activity == .responding, let start = respondingImpactStart else { return 0 }
+        let elapsed = max(0, t - start)
+        let attack = 0.07
+        let decay = 0.58
+        if elapsed < attack {
+            return elapsed / attack
+        }
+        let progress = min(1, (elapsed - attack) / decay)
+        return pow(1 - progress, 2)
+    }
+
+    private func applyMotion(for activity: AICoachOrbActivity, animated: Bool) {
+        let target: (
+            ring: Double,
+            scan: Double,
+            pulse: Double,
+            amp: Double,
+            glow: Double,
+            sweep: Double,
+            ringPulse: Double
+        )
+        switch activity {
+        case .idle:
+            // Slow steady rotation (unchanged).
+            target = (0.35, 0.55, 1.1, 0.04, 0.85, 0.45, 0.0)
+        case .thinking:
+            // Pulse-dominant: slow drift so it feels alive, not a full spin.
+            // ring ~0.14 vs idle 0.35 / responding 0.65 — clearly secondary to pulse.
+            target = (0.14, 0.20, 1.65, 0.10, 1.12, 0.20, 1.0)
+        case .responding:
+            // Fast, spin-dominant answer-arrived motion.
+            target = (1.65, 2.10, 2.4, 0.07, 1.18, 0.90, 0.0)
+        }
+
+        let apply = {
+            let now = Date().timeIntervalSinceReferenceDate
+            if activity == .responding {
+                respondingImpactStart = now
+            }
+            // Keep ring/scan angles continuous when speeds change (pulse → spin).
+            ringPhase += now * (ringSpeed - target.ring) * 28
+            scanPhase += now * (scanSpeed - target.scan) * 120
+            ringSpeed = target.ring
+            scanSpeed = target.scan
+            pulseRate = target.pulse
+            pulseAmp = target.amp
+            coreGlow = target.glow
+            scanIntensity = target.sweep
+            ringPulseBlend = target.ringPulse
+        }
+        if animated {
+            // Responding snaps in; other state handoffs remain calm and smooth.
+            let duration = activity == .responding ? 0.18 : 0.65
+            withAnimation(.easeInOut(duration: duration)) { apply() }
+        } else {
+            apply()
+        }
+    }
+
+    private var ambient: some View {
+        RadialGradient(
+            colors: [
+                accent.opacity(0.18),
+                accent.opacity(0.05),
+                .clear
+            ],
+            center: .center,
+            startRadius: size * 0.08,
+            endRadius: size * 0.72
+        )
+    }
+
+    private func coreDisc(pulse: Double, glow: Double, responseImpact: Double) -> some View {
+        let coreSize = size * 0.14
+        return ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            .white.opacity(0.92 * responseImpact),
+                            accent.opacity(0.65 * responseImpact),
+                            .clear
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: coreSize * 1.8
+                    )
+                )
+                .frame(width: coreSize * 3.6, height: coreSize * 3.6)
+                .blur(radius: coreSize * 0.28)
+            Circle()
+                .fill(accent.opacity(0.55 * glow))
+                .frame(width: coreSize * 2.2, height: coreSize * 2.2)
+                .blur(radius: coreSize * 0.55)
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            .white.opacity(0.95),
+                            accent,
+                            accent.opacity(0.35)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: coreSize * 0.55
+                    )
+                )
+                .frame(width: coreSize, height: coreSize)
+            // Even technical rim — no offset specular highlight.
+            Circle()
+                .strokeBorder(accent.opacity(0.9), lineWidth: max(0.6, size * 0.006))
+                .frame(width: coreSize * 1.35, height: coreSize * 1.35)
+        }
+        .scaleEffect(pulse * (1 + responseImpact * 0.22))
+        .allowsHitTesting(false)
+    }
+
+    private func hudRing(diameter: CGFloat, lineWidth: CGFloat, opacity: Double) -> some View {
+        Circle()
+            .stroke(accent.opacity(opacity), lineWidth: lineWidth)
+            .frame(width: diameter, height: diameter)
+    }
+
+    private func segmentedRing(
+        diameter: CGFloat,
+        segments: Int,
+        span: CGFloat,
+        gap: CGFloat,
+        lineWidth: CGFloat,
+        opacity: Double
+    ) -> some View {
+        ZStack {
+            ForEach(0..<segments, id: \.self) { index in
+                let start = CGFloat(index) * (span + gap)
+                Circle()
+                    .trim(from: start, to: start + span)
+                    .stroke(
+                        accent.opacity(opacity),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                    )
+                    .frame(width: diameter, height: diameter)
+            }
+        }
+    }
+
+    private func tickRing(diameter: CGFloat, tickCount: Int) -> some View {
+        let tickLength = size * 0.028
+        let tickWidth = max(0.6, size * 0.005)
+        return ZStack {
+            // Faint base ring under the ticks.
+            Circle()
+                .stroke(accent.opacity(0.18), lineWidth: max(0.5, size * 0.005))
+                .frame(width: diameter, height: diameter)
+
+            ForEach(0..<tickCount, id: \.self) { index in
+                Capsule()
+                    .fill(accent.opacity(index.isMultiple(of: 4) ? 0.75 : 0.35))
+                    .frame(width: tickWidth, height: tickLength)
+                    .offset(y: -diameter / 2)
+                    .rotationEffect(.degrees(Double(index) / Double(tickCount) * 360))
+            }
+        }
+        .frame(width: diameter + tickLength, height: diameter + tickLength)
+    }
+
+    /// Thin bright sweep arc — radar / scan feel on one ring.
+    private func scanSweep(diameter: CGFloat, at t: TimeInterval, phase: Double) -> some View {
+        let angle = t * scanSpeed * 120 + phase
+        return ZStack {
+            Circle()
+                .trim(from: 0.0, to: 0.12)
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            .clear,
+                            accent.opacity(0.15),
+                            .white.opacity(0.95),
+                            accent.opacity(0.4),
+                            .clear
+                        ],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: max(1.4, size * 0.016), lineCap: .round)
+                )
+                .frame(width: diameter, height: diameter)
+                .rotationEffect(.degrees(angle))
+
+            // Leading tip — small bright node.
+            Circle()
+                .fill(.white.opacity(0.9))
+                .frame(width: max(2, size * 0.022), height: max(2, size * 0.022))
+                .offset(y: -diameter / 2)
+                .rotationEffect(.degrees(angle + 360 * 0.12))
+                .shadow(color: accent.opacity(0.8), radius: size * 0.02)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct AICompanionView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var companion = AICompanionService()
+    @State private var draft = ""
+    @FocusState private var isInputFocused: Bool
+
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !companion.isSending
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                orbHeader
+                Divider()
+                    .overlay(AICompanionPalette.accent.opacity(0.12))
+                chatList
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                inputBar
+            }
+            .background(AICompanionPalette.background.ignoresSafeArea())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .foregroundStyle(AICompanionPalette.accent)
+                }
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("AI Coach")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.white)
+                        Text("SyncFit+")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(AICompanionPalette.accent.opacity(0.85))
+                    }
+                }
+            }
+            .onAppear {
+                companion.start()
+            }
+            .onDisappear {
+                companion.stop()
+            }
+        }
+    }
+
+    private var orbHeader: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                // Dark base so the orb's own ambient/bloom reads as illuminating the space.
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(red: 8 / 255, green: 16 / 255, blue: 11 / 255),
+                                Color(red: 3 / 255, green: 5 / 255, blue: 4 / 255)
+                            ],
+                            center: .center,
+                            startRadius: 8,
+                            endRadius: 220
+                        )
+                    )
+
+                // Same orb as the Home banner, just larger + ambient — activity tracks chat lifecycle.
+                AICoachOrb(size: 260, showsAmbient: true, activity: companion.orbActivity)
+                    .allowsHitTesting(false)
+            }
+            .frame(height: 300)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .strokeBorder(AICompanionPalette.accent.opacity(0.18), lineWidth: 1)
+            }
+            .shadow(color: AICompanionPalette.accent.opacity(0.28), radius: 36, y: 8)
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+
+            VStack(spacing: 6) {
+                Text("Ask about your actual training and nutrition.")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text("I can spot consistency, recovery, protein gaps, and what to progress next from your SyncFit logs.")
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(AICompanionPalette.muted)
+                    .padding(.horizontal, 30)
+            }
+            .padding(.bottom, 12)
+        }
+    }
+
+    private var chatList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    if companion.messages.isEmpty {
+                        emptyState
+                    } else {
+                        ForEach(companion.messages) { message in
+                            messageBubble(message)
+                                .id(message.id)
+                        }
+                    }
+
+                    if companion.isSending {
+                        typingRow
+                            .id("typing")
+                    }
+
+                    if let error = companion.errorMessage {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red.opacity(0.9))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 18)
+                            .padding(.top, 4)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: companion.messages) { _, _ in
+                scrollToBottom(proxy)
+            }
+            .onChange(of: companion.isSending) { _, _ in
+                scrollToBottom(proxy)
+            }
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Try asking:")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AICompanionPalette.accent)
+            Text("\"What should I focus on this week?\"")
+            Text("\"Am I eating enough protein for my goal?\"")
+            Text("\"Which lift should I progress next?\"")
+        }
+        .font(.subheadline)
+        .foregroundStyle(.white.opacity(0.86))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(AICompanionPalette.card)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(AICompanionPalette.accent.opacity(0.12), lineWidth: 1)
+        }
+    }
+
+    private func messageBubble(_ message: AICompanionMessage) -> some View {
+        HStack {
+            if message.isUser { Spacer(minLength: 36) }
+            Group {
+                if message.isUser {
+                    Text(message.text)
+                } else {
+                    // Split on paragraph breaks so headers / lists / body never glue into one wall of text.
+                    let blocks = AICoachChatMarkdown.blocks(from: message.text)
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                            Text(AICoachChatMarkdown.attributedBlock(from: block))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(message.isUser ? .black : .white)
+            .tint(message.isUser ? .black : AICompanionPalette.accent)
+            .multilineTextAlignment(message.isUser ? .trailing : .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(message.isUser ? AICompanionPalette.accent : AICompanionPalette.card)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .frame(maxWidth: UIScreen.main.bounds.width * 0.78, alignment: message.isUser ? .trailing : .leading)
+            if !message.isUser { Spacer(minLength: 36) }
+        }
+        .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
+    }
+
+    private var typingRow: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+                .tint(AICompanionPalette.accent)
+            Text("Thinking with your recent logs...")
+                .font(.caption)
+                .foregroundStyle(AICompanionPalette.muted)
+            Spacer()
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var inputBar: some View {
+        HStack(spacing: 10) {
+            TextField("Ask your AI Coach...", text: $draft, axis: .vertical)
+                .lineLimit(1...4)
+                .textInputAutocapitalization(.sentences)
+                .focused($isInputFocused)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(AICompanionPalette.field)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .foregroundStyle(.white)
+
+            Button {
+                send()
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(canSend ? .black : .white.opacity(0.45))
+                    .frame(width: 38, height: 38)
+                    .background(canSend ? AICompanionPalette.accent : Color.white.opacity(0.08))
+                    .clipShape(Circle())
+            }
+            .disabled(!canSend)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(AICompanionPalette.background)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 1)
+        }
+    }
+
+    private func send() {
+        let text = draft
+        draft = ""
+        Task {
+            await companion.send(text)
+        }
+    }
+
+    private func scrollToBottom(_ proxy: ScrollViewProxy) {
+        let id = companion.isSending ? "typing" : companion.messages.last?.id
+        guard let id else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(id, anchor: .bottom)
+            }
+        }
+    }
 }

@@ -4,6 +4,7 @@ struct WorkoutView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var dataStore: FitnessDataStore
     @EnvironmentObject private var healthKit: HealthKitService
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedDate = Date.now
     @State private var showingLogSheet = false
@@ -127,9 +128,13 @@ struct WorkoutView: View {
                             for: selectedDate,
                             profile: appState.profile
                         ),
-                        isPremium: appState.isSyncFitPlusSubscriber,
+                        isPremium: subscriptionManager.isSubscribed,
                         onViewPlan: {
-                            appState.presentSyncFitPlusUpgrade(highlight: .personalizedRoutines)
+                            if subscriptionManager.isSubscribed {
+                                appState.presentAICoach()
+                            } else {
+                                appState.presentSyncFitPlusUpgrade(highlight: .personalizedRoutines)
+                            }
                         }
                     )
                     .id(dataStore.currentCalendarDay)

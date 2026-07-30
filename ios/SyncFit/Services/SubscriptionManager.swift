@@ -442,9 +442,6 @@ final class SubscriptionManager: ObservableObject {
         subscriptionStatus = status
         subscriptionExpiresAt = expiresAt
         isSubscribed = subscribed
-        if let appState {
-            appState.setSyncFitPlusSubscriber(subscribed)
-        }
     }
 
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {

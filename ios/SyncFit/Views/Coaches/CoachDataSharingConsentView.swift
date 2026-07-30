@@ -233,6 +233,7 @@ struct CoachSharingManageView: View {
 struct MyCoachCard: View {
     let coach: CoachProfile
     let connection: CoachClientConnection
+    var hasUnreadMessage: Bool = false
     var onMessage: () -> Void
     var onOpenProfile: () -> Void
 
@@ -259,9 +260,17 @@ struct MyCoachCard: View {
 
             Spacer(minLength: 0)
 
-            Button("Message →", action: onMessage)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(CoachUIColor.accent)
+            Button(action: onMessage) {
+                HStack(spacing: 6) {
+                    Text("Message →")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(CoachUIColor.accent)
+                    if hasUnreadMessage {
+                        UnreadDotBadge(size: 8, offset: .zero)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
         }
     }
 }

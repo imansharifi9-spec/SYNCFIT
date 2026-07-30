@@ -113,7 +113,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Subscription")
                             .font(.headline)
-                        settingsRow("Plan", value: appState.isSyncFitPlusSubscriber ? "SyncFit+" : "Free")
+                        settingsRow("Plan", value: subscriptionManager.isSubscribed ? "SyncFit+" : "Free")
                         if subscriptionManager.hasPendingFirestoreSync {
                             HStack(spacing: 8) {
                                 ProgressView()
@@ -123,7 +123,7 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        Button(appState.isSyncFitPlusSubscriber ? "Manage \(SyncFitPlusBrand.name)" : SyncFitPlusBrand.upgradeButton) {
+                        Button(subscriptionManager.isSubscribed ? "Manage \(SyncFitPlusBrand.name)" : SyncFitPlusBrand.upgradeButton) {
                             appState.presentSyncFitPlusUpgrade()
                         }
                             .buttonStyle(SecondaryButtonStyle())
@@ -154,6 +154,7 @@ struct SettingsView: View {
                                 )
                                 .labelsHidden()
                                 .tint(Color(red: 92 / 255, green: 219 / 255, blue: 110 / 255))
+                                .accessibilityIdentifier("coachModeToggle")
                             }
                             Text("Switch between your athlete app and the coach portal.")
                                 .font(.caption)

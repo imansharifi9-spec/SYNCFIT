@@ -3,6 +3,7 @@ import SwiftUI
 struct RoutineEditorSheet: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var dataStore: FitnessDataStore
+    @EnvironmentObject private var subscriptionManager: SubscriptionManager
     @Environment(\.dismiss) private var dismiss
 
     let existingRoutine: WorkoutRoutine?
@@ -64,7 +65,7 @@ struct RoutineEditorSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                if isCreating, showsSyncFitPlusPromo, !appState.isSyncFitPlusSubscriber {
+                if isCreating, showsSyncFitPlusPromo, !subscriptionManager.isSubscribed {
                     Section {
                         SyncFitPlusRoutinePromo {
                             appState.presentSyncFitPlusUpgrade(highlight: .personalizedRoutines)

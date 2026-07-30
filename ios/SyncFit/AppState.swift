@@ -20,12 +20,12 @@ final class AppState: ObservableObject {
     @Published var hasCompletedOnboarding = false
     @Published var profile = UserProfile()
     @Published var appearance: AppAppearance = .dark
-    @Published var isSyncFitPlusSubscriber = false
     @Published var appleHealthSyncEnabled = false
     @Published var nutritionMacroDisplayStyle: NutritionMacroDisplayStyle = .bars
     @Published var restTimerSeconds: Int = 90
     @Published var showingSyncFitPlusUpgrade = false
     @Published var syncFitPlusUpgradeHighlight: SyncFitPlusFeature = .general
+    @Published var showingAICoach = false
     @Published var selectedTab: AppTab = .home
     @Published var shouldPresentScheduleSetup = false
     @Published var pendingWorkoutHomeAction: WorkoutHomeAction?
@@ -48,6 +48,7 @@ final class AppState: ObservableObject {
         // via resetProfileForUserSwitch() before cloud restore.
         selectedTab = .home
         showingSyncFitPlusUpgrade = false
+        showingAICoach = false
         isRestoringSession = false
         settings.isAuthenticated = false
         try? context.save()
@@ -76,6 +77,7 @@ final class AppState: ObservableObject {
         profile = UserProfile()
         selectedTab = .home
         showingSyncFitPlusUpgrade = false
+        showingAICoach = false
         settings.hasCompletedOnboarding = false
         settings.hasCompletedProgramSetup = false
         settings.profile = UserProfile()
@@ -124,16 +126,8 @@ final class AppState: ObservableObject {
         showingSyncFitPlusUpgrade = true
     }
 
-    /// Placeholder until StoreKit is wired — unlocks preview access on device.
-    func presentSyncFitPlusUpgradeConfirmed() {
-        setSyncFitPlusSubscriber(true)
-        showingSyncFitPlusUpgrade = false
-    }
-
-    /// Driven by SubscriptionManager entitlement checks (StoreKit 2).
-    func setSyncFitPlusSubscriber(_ subscribed: Bool) {
-        isSyncFitPlusSubscriber = subscribed
-        persist()
+    func presentAICoach() {
+        showingAICoach = true
     }
 
     func completeProgramSetup(buildYourOwn: Bool = false) {
@@ -154,7 +148,6 @@ final class AppState: ObservableObject {
         hasCompletedOnboarding = settings.hasCompletedOnboarding
         profile = settings.profile
         appearance = settings.appearance
-        isSyncFitPlusSubscriber = settings.isSyncFitPlusSubscriber
         appleHealthSyncEnabled = settings.appleHealthSyncEnabled
         nutritionMacroDisplayStyle = settings.nutritionMacroDisplayStyle
         restTimerSeconds = settings.restTimerSeconds
@@ -169,7 +162,6 @@ final class AppState: ObservableObject {
         settings.hasCompletedOnboarding = hasCompletedOnboarding
         settings.profile = profile
         settings.appearance = appearance
-        settings.isSyncFitPlusSubscriber = isSyncFitPlusSubscriber
         settings.appleHealthSyncEnabled = appleHealthSyncEnabled
         settings.nutritionMacroDisplayStyle = nutritionMacroDisplayStyle
         settings.restTimerSeconds = restTimerSeconds

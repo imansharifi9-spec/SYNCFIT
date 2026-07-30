@@ -127,6 +127,8 @@ struct UserProfile: Codable {
     var proteinTarget: Int = 150
     var carbTarget: Int = 220
     var fatTarget: Int = 70
+    var photoFileName: String?
+    var photoURL: String?
 
     var age: Int {
         max(Calendar.current.dateComponents([.year], from: birthday, to: .now).year ?? 0, 0)
@@ -519,21 +521,34 @@ struct ProgressPhotoEntry: Identifiable, Codable {
     var date: Date
     var fileName: String
     var userId: String
+    /// Remote Firebase Storage download URL (nil for legacy local-only photos).
+    var downloadURL: String?
+    /// Storage object path, e.g. users/{uid}/progress_photos/{id}.jpg
+    var storagePath: String?
 
     init(
         id: UUID = UUID(),
         date: Date = .now,
         fileName: String,
-        userId: String = ProgressPhotoStorage.localUserId
+        userId: String = ProgressPhotoStorage.localUserId,
+        downloadURL: String? = nil,
+        storagePath: String? = nil
     ) {
         self.id = id
         self.date = date
         self.fileName = fileName
         self.userId = userId
+        self.downloadURL = downloadURL
+        self.storagePath = storagePath
     }
 
     var imageURL: URL {
         ProgressPhotoStorage.imageURL(fileName: fileName, userId: userId)
+    }
+
+    var hasRemoteImage: Bool {
+        if let downloadURL, !downloadURL.isEmpty { return true }
+        return false
     }
 }
 
@@ -591,6 +606,7 @@ struct CoachProfile: Identifiable, Codable, Hashable {
     var specialties: [String]
     var reviews: [CoachReview]
     var photoFileName: String?
+    var photoURL: String?
     var transformationPhotoFileNames: [String]
     var isLive: Bool
     var isListed: Bool
@@ -613,6 +629,7 @@ struct CoachProfile: Identifiable, Codable, Hashable {
         specialties: [String] = [],
         reviews: [CoachReview] = [],
         photoFileName: String? = nil,
+        photoURL: String? = nil,
         transformationPhotoFileNames: [String] = [],
         isLive: Bool = true,
         isListed: Bool = true,
@@ -634,6 +651,7 @@ struct CoachProfile: Identifiable, Codable, Hashable {
         self.specialties = specialties.isEmpty ? [specialty] : specialties
         self.reviews = reviews
         self.photoFileName = photoFileName
+        self.photoURL = photoURL
         self.transformationPhotoFileNames = transformationPhotoFileNames
         self.isLive = isLive
         self.isListed = isListed

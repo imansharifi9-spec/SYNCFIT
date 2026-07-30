@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		T10000000000000000000007 /* AICoachChatMarkdownTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T10000000000000000000006 /* AICoachChatMarkdownTests.swift */; };
 		9D7893822239E831EA17D964 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = B5F7F9F0CA39C29E98DC83AA /* FirebaseFunctions */; };
 		A10000000000000000000001 /* SyncFitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* SyncFitApp.swift */; };
 		A10000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppState.swift */; };
@@ -114,6 +115,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		T10000000000000000000006 /* AICoachChatMarkdownTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AICoachChatMarkdownTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000001 /* SyncFitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncFitApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
@@ -456,6 +458,7 @@
 		T20000000000000000000001 /* SyncFitTests */ = {
 			isa = PBXGroup;
 			children = (
+				T10000000000000000000006 /* AICoachChatMarkdownTests.swift */,
 				T10000000000000000000009 /* CoachCheckoutCallbackValidatorTests.swift */,
 				T1000000000000000000000B /* CoachCheckoutConfirmationTests.swift */,
 				T1000000000000000000000D /* DeleteAccountErrorMapperTests.swift */,
@@ -685,6 +688,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				T10000000000000000000007 /* AICoachChatMarkdownTests.swift in Sources */,
 				T10000000000000000000008 /* CoachCheckoutCallbackValidatorTests.swift in Sources */,
 				T1000000000000000000000A /* CoachCheckoutConfirmationTests.swift in Sources */,
 				T1000000000000000000000C /* DeleteAccountErrorMapperTests.swift in Sources */,

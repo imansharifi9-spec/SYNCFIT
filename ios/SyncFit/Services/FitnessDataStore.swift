@@ -186,6 +186,23 @@ final class FitnessDataStore: ObservableObject {
         scheduledRoutine(for: date)
     }
 
+
+    /// True when at least one workout entry on this day has completed/logged sets.
+    func hasLoggedWorkoutHistory(on date: Date, calendar: Calendar = .current) -> Bool {
+        workouts(on: date, calendar: calendar).contains { !$0.sets.isEmpty }
+    }
+
+    /// Shared day title for Home + Workouts: frozen session label when the day was trained,
+    /// otherwise the current schedule/routine display name.
+    func workoutDayDisplayTitle(for date: Date) -> String {
+        if hasLoggedWorkoutHistory(on: date),
+           let label = sessionLabel(for: date),
+           !label.isEmpty {
+            return label
+        }
+        return routineDisplayName(for: date)
+    }
+
     func routineDisplayName(for date: Date) -> String {
         if let routine = routine(for: date) {
             return routine.name
@@ -2659,6 +2676,31 @@ final class FitnessDataStore: ObservableObject {
         ProgressPhotoStorage.delete(fileName: record.fileName, userId: record.userId)
         context.delete(record)
         saveAndReload()
+    }
+
+
+    /// Merge cloud progress-photo metadata into local SwiftData (keeps local image cache).
+    func mergeCloudProgressPhotos(_ cloudPhotos: [ProgressPhotoEntry]) {
+        guard !cloudPhotos.isEmpty else { return }
+        var changed = false
+        for cloud in cloudPhotos {
+            let targetID = cloud.id
+            var descriptor = FetchDescriptor<ProgressPhotoRecord>(
+                predicate: #Predicate { $0.id == targetID }
+            )
+            if let existing = try? context.fetch(descriptor).first {
+                if existing.userId != cloud.userId {
+                    existing.userId = cloud.userId
+                    changed = true
+                }
+            } else {
+                context.insert(ProgressPhotoRecord(from: cloud))
+                changed = true
+            }
+        }
+        if changed {
+            saveAndReload()
+        }
     }
 
     private func saveAndReload() {
